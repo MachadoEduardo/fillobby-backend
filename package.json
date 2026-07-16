@@ -2,6 +2,7 @@
   "name": "fillobby",
   "version": "1.0.0",
   "description": "API REST para grupos de amigos organizarem, votarem e acompanharem uma fila compartilhada de jogos.",
+  "type": "module",
   "main": "app.js",
   "scripts": {
     "start": "node app.js",

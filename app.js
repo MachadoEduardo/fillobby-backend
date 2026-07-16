@@ -1,7 +1,8 @@
-const express = require('express');
-const connectDatabase = require('./src/config/database');
-const env = require('./src/config/env');
-const cors = require("cors");
+import { pathToFileURL } from 'node:url';
+import cors from 'cors';
+import express from 'express';
+import connectDatabase from './src/config/database.js';
+import env from './src/config/env.js';
 
 const app = express();
 
@@ -36,7 +37,10 @@ app.use((req, res) => {
   res.status(404).json({ message: 'Rota nao encontrada' });
 });
 
-if (require.main === module) {
+const isMainModule =
+  process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+
+if (isMainModule) {
   connectDatabase()
     .then(() => {
       app.listen(env.port, () => {
@@ -49,4 +53,4 @@ if (require.main === module) {
     });
 }
 
-module.exports = app;
+export default app;
