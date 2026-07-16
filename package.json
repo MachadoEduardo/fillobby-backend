@@ -1,0 +1,19 @@
+{
+  "name": "fillobby",
+  "version": "1.0.0",
+  "description": "API REST para grupos de amigos organizarem, votarem e acompanharem uma fila compartilhada de jogos.",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "dev": "node app.js"
+  },
+  "keywords": [],
+  "author": "Eduardo Machado",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "mongoose": "^9.7.4"
+  }
+}
