@@ -1,40 +1,29 @@
-import mongoose from 'mongoose';
+import mongoose from "mongoose";
 
 const userSchema = new mongoose.Schema(
   {
     name: {
-        type: String,
-        required: [true, 'Nome é obrigatório'],
-        trim: true,
-        minLength: [3, 'Nome deve ter no mínimo 3 caracteres'],
-        maxLength: [50, 'Nome deve ter no máximo 50 caracteres']
+      type: String,
+      required: [true, "Nome e obrigatorio"],
+      trim: true,
+      minLength: [2, "Nome deve ter no minimo 2 caracteres"],
+      maxLength: [80, "Nome deve ter no maximo 80 caracteres"],
     },
     email: {
-        type: String,
-        required: [true, 'Email é obrigatório'],
-        unique: true,
-        lowercase: true,
-        trim: true,
-        match: [/^\S+@\S+\.\S+$/, 'Email inválido'],
+      type: String,
+      required: [true, "Email e obrigatorio"],
+      unique: true,
+      lowercase: true,
+      trim: true,
+      match: [/^\S+@\S+\.\S+$/, "Email invalido"],
     },
-    passwordHash: {
-        type: String,
-        required: true,
-        select: false,
-    },
-    avatarUrl: {
-        type: String,
-        trim: true,
-        default: null,
-    },
-    isActive: {
-        type: Boolean,
-        default: true,
-    },
+    passwordHash: { type: String, required: true, select: false },
+    avatarUrl: { type: String, trim: true, default: null },
+    isActive: { type: Boolean, default: true },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
-const User = mongoose.model('User', userSchema);
+const User = mongoose.model("User", userSchema);
 
 export default User;
