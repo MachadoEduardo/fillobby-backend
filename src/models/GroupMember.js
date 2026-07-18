@@ -5,16 +5,12 @@ const groupMemberSchema = new mongoose.Schema(
     group: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Group",
-      required: [true, "Grupo é obrigatório"],
+      required: true,
     },
-    user: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: [true, "Usuario é obrigatório"],
-    },
+    user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
     role: {
       type: String,
-      required: [true, "Papel é obrigatório"],
+      required: true,
       enum: ["OWNER", "ADMIN", "MEMBER"],
       default: "MEMBER",
     },
@@ -23,17 +19,13 @@ const groupMemberSchema = new mongoose.Schema(
       enum: ["ACTIVE", "INACTIVE", "REMOVED"],
       default: "ACTIVE",
     },
-    joinedAt: {
-      type: Date,
-      default: mongoose.now,
-    },
+    joinedAt: { type: Date, default: Date.now },
   },
   { timestamps: true },
 );
 
 groupMemberSchema.index({ group: 1, user: 1 }, { unique: true });
 groupMemberSchema.index({ user: 1, status: 1 });
+groupMemberSchema.index({ group: 1, status: 1, role: 1 });
 
-const GroupMember = mongoose.model("GroupMember", groupMemberSchema);
-
-export default GroupMember;
+export default mongoose.model("GroupMember", groupMemberSchema);

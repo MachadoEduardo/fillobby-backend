@@ -8,6 +8,7 @@ export function validate(schema) {
       return next(new AppError('VALIDATION_ERROR', 'Dados invalidos.', 422, details));
     }
 
+    req.validated = result.data;
     if (result.data.body !== undefined) req.body = result.data.body;
     return next();
   };

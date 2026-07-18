@@ -4,33 +4,21 @@ const groupSchema = new mongoose.Schema(
   {
     name: {
       type: String,
-      required: [true, "Nome é obrigatório"],
+      required: true,
       trim: true,
-      minLength: [3, "Nome deve ter no mínimo 3 caracteres"],
-      maxLength: [50, "Nome deve ter no máximo 50 caracteres"],
+      minLength: 3,
+      maxLength: 80,
     },
-    description: {
-      type: String,
-      maxLength: [500, "Descricao deve ter no máximo 500 caracteres"],
-    },
+    description: { type: String, trim: true, maxLength: 500, default: null },
     owner: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: [true, "Dono é obrigatório"],
+      required: true,
     },
-    inviteCode: {
-      type: String,
-      unique: true,
-      sparse: true,
-    },
-    isActive: {
-      type: Boolean,
-      default: true,
-    },
+    inviteCode: { type: String, required: true, unique: true },
+    isActive: { type: Boolean, default: true },
   },
   { timestamps: true },
 );
 
-const Group = mongoose.model("Group", groupSchema);
-
-export default Group;
+export default mongoose.model("Group", groupSchema);

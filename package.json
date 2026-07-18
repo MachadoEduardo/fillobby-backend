@@ -7,8 +7,8 @@
   "scripts": {
     "start": "node app.js",
     "dev": "node app.js",
-    "test": "vitest run",
-    "test:watch": "vitest"
+    "test": "vitest run --no-file-parallelism",
+    "test:watch": "vitest --no-file-parallelism"
   },
   "keywords": [],
   "author": "Eduardo Machado",
