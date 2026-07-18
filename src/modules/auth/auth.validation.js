@@ -2,7 +2,7 @@ import { z } from "zod";
 
 const password = z
   .string()
-  .min(8)
+  .min(8, "Senha deve ser maior ou igual a 8 caracteres")
   .refine(
     (value) => Buffer.byteLength(value, "utf8") <= 72,
     "Senha deve ter no maximo 72 bytes",
@@ -20,8 +20,12 @@ const base = z.object({
 export const registerSchema = base.extend({
   body: z
     .object({
-      name: z.string().trim().min(2).max(80),
-      email: z.string().trim().toLowerCase().email(),
+      name: z
+        .string()
+        .trim()
+        .min(2, "Nome deve ser maior ou igual a 2 caracteres")
+        .max(80, "Nome deve ser menor ou igual a 80 caracteres"),
+      email: z.string().trim().toLowerCase().email("Email invalido"),
       password,
     })
     .strict(),
