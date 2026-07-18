@@ -14,4 +14,13 @@ As rotas de autenticação estão disponíveis em `/api/v1/auth`:
 - `POST /login` para obter um JWT;
 - `GET /me` com `Authorization: Bearer <token>` para consultar o usuário autenticado.
 
+As rotas de grupos estão disponíveis em `/api/v1/groups`:
+
+- `POST /` para criar um grupo;
+- `GET /` e `GET /:groupId` para listar e detalhar grupos acessíveis;
+- `POST /join` para entrar usando convite;
+- `GET /:groupId/members` para listar membros;
+- `PATCH /:groupId` e `DELETE /:groupId` para administrar o grupo;
+- `PATCH /:groupId/members/:userId/role`, `DELETE /:groupId/members/:userId` e `POST /:groupId/transfer-owner` para administração de membros e propriedade.
+
 Execute `npm test` para a suíte automatizada. Os testes de integração são executados quando `TEST_MONGO_URI` aponta para um banco MongoDB isolado.
