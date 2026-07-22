@@ -4,47 +4,46 @@ const gameSchema = new mongoose.Schema(
   {
     title: {
       type: String,
-      required: [true, "Título é obrigatório"],
-      minLength: [1, "Tamanho mínimo de caracteres do título: 1"],
-      maxLength: [120, "Tamanho máximo de caracteres do título: 120"],
+      required: [true, "Titulo e obrigatorio"],
+      trim: true,
+      minLength: [1, "Titulo deve ter no minimo 1 caractere"],
+      maxLength: [120, "Titulo deve ter no maximo 120 caracteres"],
+    },
+    normalizedTitle: {
+      type: String,
+      required: true,
+      unique: true,
+      select: false,
     },
     platforms: {
       type: [String],
-      required: [true, "Plataforma é obrigatório"],
+      required: [true, "Plataformas sao obrigatorias"],
       enum: ["PC", "PlayStation", "Xbox", "Switch"],
       validate: {
-        validator: (values) => values.length > 0,
-        message: "Informe pelo menos uma plataforma",
+        validator: (values) =>
+          values.length > 0 && new Set(values).size === values.length,
+        message: "Informe plataformas sem duplicatas",
       },
     },
     maxPlayers: {
       type: Number,
-      min: 1,
+      default: null,
+      min: [1, "Maximo de jogadores deve ser maior que zero"],
       validate: {
-        validator: Number.isInteger,
-        message: "Máximo de jogadores deve ser um número inteiro",
+        validator: (value) => value === null || Number.isInteger(value),
+        message: "Maximo de jogadores deve ser um numero inteiro",
       },
     },
-    coverUrl: {
-      type: String,
-    },
-    description: {
-      type: String,
-      maxLength: [1000, "O tamanho máximo e 1000 caracteres"],
-    },
+    coverUrl: { type: String, trim: true, default: null },
+    description: { type: String, trim: true, maxLength: 1000, default: null },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: [true, "Criador é obrigatório"],
+      required: true,
     },
-    isActive: {
-        type: Boolean,
-        default: true
-    }
+    isActive: { type: Boolean, default: true },
   },
   { timestamps: true },
 );
 
-const Game = mongoose.model("Game", gameSchema);
-
-export default Game;
+export default mongoose.model("Game", gameSchema);

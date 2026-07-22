@@ -6,6 +6,7 @@ import connectDatabase from './src/config/database.js';
 import env from './src/config/env.js';
 import authRoutes from './src/modules/auth/auth.routes.js';
 import groupsRoutes from './src/modules/groups/groups.routes.js';
+import gamesRoutes from './src/modules/games/games.routes.js';
 import { errorMiddleware, notFoundMiddleware } from './src/middlewares/error.middleware.js';
 
 const app = express();
@@ -26,6 +27,7 @@ app.use(express.json());
 app.get('/', (req, res) => res.status(200).json({ success: true, data: { message: 'API Fillobby em funcionamento!' } }));
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/groups', groupsRoutes);
+app.use('/api/v1/games', gamesRoutes);
 app.use(notFoundMiddleware);
 app.use(errorMiddleware);
 

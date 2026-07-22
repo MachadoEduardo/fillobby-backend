@@ -23,4 +23,12 @@ As rotas de grupos estão disponíveis em `/api/v1/groups`:
 - `PATCH /:groupId` e `DELETE /:groupId` para administrar o grupo;
 - `PATCH /:groupId/members/:userId/role`, `DELETE /:groupId/members/:userId` e `POST /:groupId/transfer-owner` para administração de membros e propriedade.
 
+As rotas do catálogo de jogos estão disponíveis em `/api/v1/games`:
+
+- `POST /` para cadastrar um jogo, rejeitando títulos normalizados duplicados;
+- `GET /` para listar jogos ativos com busca, plataforma e paginação;
+- `GET /:gameId` para detalhar um jogo ativo;
+- `PATCH /:gameId` para o autor editar o jogo;
+- `DELETE /:gameId` para o autor inativar o jogo sem remover referências.
+
 Execute `npm test` para a suíte automatizada. Os testes de integração são executados quando `TEST_MONGO_URI` aponta para um banco MongoDB isolado.
