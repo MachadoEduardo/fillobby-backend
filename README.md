@@ -31,4 +31,14 @@ As rotas do catálogo de jogos estão disponíveis em `/api/v1/games`:
 - `PATCH /:gameId` para o autor editar o jogo;
 - `DELETE /:gameId` para o autor inativar o jogo sem remover referências.
 
+As rotas da fila estão disponíveis em `/api/v1/groups/:groupId/queue`:
+
+- `POST /` para um membro ativo sugerir um jogo ativo;
+- `GET /` para listar itens ativos com status, busca, plataforma, ordenação e paginação;
+- `GET /:itemId` para detalhar um item ativo;
+- `PATCH /:itemId/status` para `OWNER` ou `ADMIN` executar uma transição pública válida;
+- `DELETE /:itemId` para `OWNER` ou `ADMIN` cancelar sem excluir fisicamente.
+
+Itens novos começam em `SUGGESTED`. `COMPLETED` e `CANCELLED` são somente leitura, e o mesmo jogo não pode possuir dois itens ativos no mesmo grupo.
+
 Execute `npm test` para a suíte automatizada. Os testes de integração são executados quando `TEST_MONGO_URI` aponta para um banco MongoDB isolado.
