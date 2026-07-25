@@ -54,4 +54,12 @@ As rotas de votos estão disponíveis em `/api/v1/groups/:groupId/queue/:itemId/
 
 Criação e remoção são permitidas somente enquanto o item está em `VOTING`. O voto é único por usuário e item, e sua persistência é atualizada na mesma transação que o `voteCount`.
 
+O histórico está disponível em `GET /api/v1/groups/:groupId/history` para membros ativos. A rota retorna somente itens `COMPLETED`, ordenados por conclusão mais recente, e aceita:
+
+- `from` e `to` no formato `YYYY-MM-DD`, com intervalo inclusivo em UTC;
+- `gameId` e `participantId`;
+- `page` e `limit`, com limite máximo de 100.
+
+Itens históricos permanecem somente leitura e continuam disponíveis quando o jogo é inativado.
+
 Execute `npm test` para a suíte automatizada. Os testes de integração são executados quando `TEST_MONGO_URI` aponta para um banco MongoDB isolado.
