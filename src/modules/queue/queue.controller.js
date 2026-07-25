@@ -53,6 +53,48 @@ export async function transition(req, res, next) {
   }
 }
 
+export async function selectParticipants(req, res, next) {
+  try {
+    const data = await queueService.selectQueueParticipants({
+      groupId: req.validated.params.groupId,
+      userId: req.user._id,
+      itemId: req.validated.params.itemId,
+      participantIds: req.body.participantIds,
+    });
+    return res.status(200).json({ success: true, data });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+export async function markReady(req, res, next) {
+  try {
+    const data = await queueService.setQueueReadiness({
+      groupId: req.validated.params.groupId,
+      userId: req.user._id,
+      itemId: req.validated.params.itemId,
+      isReady: true,
+    });
+    return res.status(200).json({ success: true, data });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+export async function unmarkReady(req, res, next) {
+  try {
+    const data = await queueService.setQueueReadiness({
+      groupId: req.validated.params.groupId,
+      userId: req.user._id,
+      itemId: req.validated.params.itemId,
+      isReady: false,
+    });
+    return res.status(200).json({ success: true, data });
+  } catch (error) {
+    return next(error);
+  }
+}
+
 export async function remove(req, res, next) {
   try {
     const data = await queueService.cancelQueueItem({

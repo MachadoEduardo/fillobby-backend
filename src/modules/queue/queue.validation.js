@@ -86,3 +86,29 @@ export const transitionQueueSchema = z.object({
   params: itemParams,
   query: emptyQuery,
 });
+
+export const selectParticipantsSchema = z.object({
+  body: z
+    .object({
+      participantIds: z
+        .array(objectId("Identificador do participante"))
+        .min(1, "Informe ao menos um participante.")
+        .superRefine((values, context) => {
+          if (new Set(values).size !== values.length) {
+            context.addIssue({
+              code: "custom",
+              message: "Informe participantes sem duplicatas.",
+            });
+          }
+        }),
+    })
+    .strict(),
+  params: itemParams,
+  query: emptyQuery,
+});
+
+export const readinessSchema = z.object({
+  body: z.object({}).strict().default({}),
+  params: itemParams,
+  query: emptyQuery,
+});

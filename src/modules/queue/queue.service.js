@@ -1,4 +1,6 @@
+import mongoose from "mongoose";
 import Game from "../../models/Game.js";
+import GroupMember from "../../models/GroupMember.js";
 import QueueItem from "../../models/QueueItem.js";
 import AppError from "../../shared/errors/AppError.js";
 import { getActiveGroupContext } from "../groups/groups.service.js";
@@ -67,6 +69,22 @@ function duplicateQueueItemError() {
   return new AppError(
     "QUEUE_ITEM_ALREADY_EXISTS",
     "Este jogo ja possui um item ativo na fila.",
+    409,
+  );
+}
+
+function participantsNotEditableError() {
+  return new AppError(
+    "QUEUE_PARTICIPANTS_NOT_EDITABLE",
+    "Os participantes nao podem ser alterados no estado atual.",
+    409,
+  );
+}
+
+function readinessNotEditableError() {
+  return new AppError(
+    "QUEUE_READINESS_NOT_EDITABLE",
+    "A prontidao nao pode ser alterada no estado atual.",
     409,
   );
 }
@@ -196,6 +214,156 @@ export async function transitionQueueItem({
     targetStatus === QUEUE_STATUS.COMPLETED ? new Date() : null;
   await item.save();
   return serializeQueueItem(await populateItem(item));
+}
+
+export async function selectQueueParticipants({
+  groupId,
+  userId,
+  itemId,
+  participantIds,
+}) {
+  const { group, membership } = await getActiveGroupContext(groupId, userId);
+  requireAdmin(membership);
+  const item = await findQueueItem(group._id, itemId, false);
+  const editableStatuses = [QUEUE_STATUS.VOTING, QUEUE_STATUS.WAITING_PLAYERS];
+
+  if (!editableStatuses.includes(item.status)) {
+    throw participantsNotEditableError();
+  }
+
+  const game = await Game.findById(item.game).select("maxPlayers");
+  if (
+    game?.maxPlayers !== null &&
+    game?.maxPlayers !== undefined &&
+    participantIds.length > game.maxPlayers
+  ) {
+    throw new AppError(
+      "MAX_PLAYERS_EXCEEDED",
+      `Este jogo permite no maximo ${game.maxPlayers} participantes.`,
+      422,
+    );
+  }
+
+  const activeMembers = await GroupMember.countDocuments({
+    group: group._id,
+    user: { $in: participantIds },
+    status: "ACTIVE",
+  });
+  if (activeMembers !== participantIds.length) {
+    throw new AppError(
+      "INVALID_QUEUE_PARTICIPANTS",
+      "Todos os participantes devem ser membros ativos do grupo.",
+      422,
+    );
+  }
+
+  const participantObjectIds = participantIds.map(
+    (participantId) => new mongoose.Types.ObjectId(participantId),
+  );
+  const updatedItem = await QueueItem.findOneAndUpdate(
+    {
+      _id: item._id,
+      group: group._id,
+      status: { $in: editableStatuses },
+    },
+    [
+      {
+        $set: {
+          participants: participantObjectIds,
+          readyUsers: {
+            $cond: [
+              { $eq: ["$status", QUEUE_STATUS.VOTING] },
+              [],
+              { $setIntersection: ["$readyUsers", participantObjectIds] },
+            ],
+          },
+        },
+      },
+      {
+        $set: {
+          status: {
+            $cond: [
+              { $setEquals: ["$participants", "$readyUsers"] },
+              QUEUE_STATUS.READY,
+              QUEUE_STATUS.WAITING_PLAYERS,
+            ],
+          },
+        },
+      },
+    ],
+    { returnDocument: "after", updatePipeline: true },
+  );
+
+  if (!updatedItem) throw participantsNotEditableError();
+  return serializeQueueItem(await populateItem(updatedItem));
+}
+
+export async function setQueueReadiness({ groupId, userId, itemId, isReady }) {
+  const { group } = await getActiveGroupContext(groupId, userId);
+  const item = await findQueueItem(group._id, itemId, false);
+  const readinessStatuses = [QUEUE_STATUS.WAITING_PLAYERS, QUEUE_STATUS.READY];
+
+  if (!readinessStatuses.includes(item.status)) {
+    throw readinessNotEditableError();
+  }
+  if (
+    !item.participants.some((participantId) => id(participantId) === id(userId))
+  ) {
+    throw new AppError(
+      "NOT_QUEUE_PARTICIPANT",
+      "Somente participantes podem alterar a propria prontidao.",
+      403,
+    );
+  }
+
+  const userObjectId = new mongoose.Types.ObjectId(id(userId));
+  const readinessUpdate = isReady
+    ? { $setUnion: ["$readyUsers", [userObjectId]] }
+    : { $setDifference: ["$readyUsers", [userObjectId]] };
+  const updatedItem = await QueueItem.findOneAndUpdate(
+    {
+      _id: item._id,
+      group: group._id,
+      status: { $in: readinessStatuses },
+      participants: userObjectId,
+    },
+    [
+      { $set: { readyUsers: readinessUpdate } },
+      {
+        $set: {
+          status: isReady
+            ? {
+                $cond: [
+                  {
+                    $and: [
+                      { $gt: [{ $size: "$participants" }, 0] },
+                      { $setEquals: ["$participants", "$readyUsers"] },
+                    ],
+                  },
+                  QUEUE_STATUS.READY,
+                  QUEUE_STATUS.WAITING_PLAYERS,
+                ],
+              }
+            : QUEUE_STATUS.WAITING_PLAYERS,
+        },
+      },
+    ],
+    { returnDocument: "after", updatePipeline: true },
+  );
+
+  if (!updatedItem) {
+    const currentItem = await findQueueItem(group._id, itemId, false);
+    if (!readinessStatuses.includes(currentItem.status)) {
+      throw readinessNotEditableError();
+    }
+    throw new AppError(
+      "NOT_QUEUE_PARTICIPANT",
+      "Somente participantes podem alterar a propria prontidao.",
+      403,
+    );
+  }
+
+  return serializeQueueItem(await populateItem(updatedItem));
 }
 
 export async function cancelQueueItem({ groupId, userId, itemId }) {

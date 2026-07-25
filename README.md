@@ -37,9 +37,14 @@ As rotas da fila estão disponíveis em `/api/v1/groups/:groupId/queue`:
 - `GET /` para listar itens ativos com status, busca, plataforma, ordenação e paginação;
 - `GET /:itemId` para detalhar um item ativo;
 - `PATCH /:itemId/status` para `OWNER` ou `ADMIN` executar uma transição pública válida;
+- `PUT /:itemId/participants` para `OWNER` ou `ADMIN` definir participantes ativos;
+- `POST /:itemId/ready` para o participante autenticado marcar prontidão;
+- `DELETE /:itemId/ready` para o participante autenticado retirar prontidão;
 - `DELETE /:itemId` para `OWNER` ou `ADMIN` cancelar sem excluir fisicamente.
 
 Itens novos começam em `SUGGESTED`. `COMPLETED` e `CANCELLED` são somente leitura, e o mesmo jogo não pode possuir dois itens ativos no mesmo grupo.
+
+A seleção de participantes encerra a votação, respeita o `maxPlayers` do jogo e mantém `readyUsers` como subconjunto de `participants`. A prontidão é idempotente: o último participante pronto promove o item para `READY`, e qualquer retirada devolve o item para `WAITING_PLAYERS`.
 
 As rotas de votos estão disponíveis em `/api/v1/groups/:groupId/queue/:itemId/votes`:
 
