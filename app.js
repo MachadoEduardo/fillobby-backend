@@ -8,6 +8,7 @@ import authRoutes from './src/modules/auth/auth.routes.js';
 import groupsRoutes from './src/modules/groups/groups.routes.js';
 import gamesRoutes from './src/modules/games/games.routes.js';
 import queueRoutes from './src/modules/queue/queue.routes.js';
+import votesRoutes from './src/modules/votes/votes.routes.js';
 import { errorMiddleware, notFoundMiddleware } from './src/middlewares/error.middleware.js';
 
 const app = express();
@@ -30,6 +31,7 @@ app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/groups', groupsRoutes);
 app.use('/api/v1/games', gamesRoutes);
 app.use('/api/v1/groups/:groupId/queue', queueRoutes);
+app.use('/api/v1/groups/:groupId/queue/:itemId/votes', votesRoutes);
 app.use(notFoundMiddleware);
 app.use(errorMiddleware);
 

@@ -41,4 +41,12 @@ As rotas da fila estão disponíveis em `/api/v1/groups/:groupId/queue`:
 
 Itens novos começam em `SUGGESTED`. `COMPLETED` e `CANCELLED` são somente leitura, e o mesmo jogo não pode possuir dois itens ativos no mesmo grupo.
 
+As rotas de votos estão disponíveis em `/api/v1/groups/:groupId/queue/:itemId/votes`:
+
+- `POST /` para um membro ativo criar o próprio voto;
+- `DELETE /me` para remover o próprio voto;
+- `GET /` para listar votos com paginação, sem expor o e-mail dos usuários.
+
+Criação e remoção são permitidas somente enquanto o item está em `VOTING`. O voto é único por usuário e item, e sua persistência é atualizada na mesma transação que o `voteCount`.
+
 Execute `npm test` para a suíte automatizada. Os testes de integração são executados quando `TEST_MONGO_URI` aponta para um banco MongoDB isolado.
