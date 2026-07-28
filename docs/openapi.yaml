@@ -1,0 +1,1926 @@
+openapi: 3.1.0
+
+info:
+  title: Fillobby API
+  version: 1.0.0
+  description: |
+    API REST para grupos de amigos organizarem uma fila compartilhada de jogos.
+
+    Todas as respostas são JSON e usam um envelope com `success` e `data` em
+    caso de sucesso, ou `success` e `error` em caso de falha.
+
+    Salvo quando indicado, as operações exigem um JWT no header
+    `Authorization: Bearer <token>`. Operações dentro de um grupo também exigem
+    que o usuário seja um membro ativo. Recursos de grupos inacessíveis podem
+    responder `404` para evitar enumeração.
+
+servers:
+  - url: http://localhost:3000
+    description: Ambiente local
+  - url: https://fillobby-backend.onrender.com
+    description: Produção (substituir pela URL real)
+
+tags:
+  - name: Health
+  - name: Auth
+  - name: Groups
+  - name: Games
+  - name: Queue
+  - name: Votes
+  - name: History
+
+security:
+  - bearerAuth: []
+
+paths:
+  /:
+    get:
+      tags: [Health]
+      operationId: healthCheck
+      summary: Verificar disponibilidade da API
+      security: []
+      responses:
+        "200":
+          description: API disponível.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthSuccess"
+
+  /api/v1/auth/register:
+    post:
+      tags: [Auth]
+      operationId: register
+      summary: Cadastrar usuário
+      description: |
+        Cria uma conta e retorna o usuário público. O cadastro não retorna JWT;
+        o cliente deve chamar o endpoint de login em seguida.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterInput"
+      responses:
+        "201":
+          description: Usuário cadastrado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserSuccess"
+        "409":
+          description: "`EMAIL_ALREADY_EXISTS`: e-mail já cadastrado."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "429":
+          description: Limite de cinco cadastros por IP por hora excedido.
+
+  /api/v1/auth/login:
+    post:
+      tags: [Auth]
+      operationId: login
+      summary: Autenticar usuário
+      description: Retorna um JWT com expiração configurada no servidor e o usuário público.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginInput"
+      responses:
+        "200":
+          description: Login realizado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginSuccess"
+        "401":
+          description: "`INVALID_CREDENTIALS`: e-mail ou senha inválidos."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+        "429":
+          description: Limite de dez tentativas por IP em quinze minutos excedido.
+
+  /api/v1/auth/me:
+    get:
+      tags: [Auth]
+      operationId: getCurrentUser
+      summary: Consultar usuário autenticado
+      responses:
+        "200":
+          description: Usuário autenticado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CurrentUserSuccess"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/groups:
+    post:
+      tags: [Groups]
+      operationId: createGroup
+      summary: Criar grupo
+      description: |
+        Cria um grupo e torna o usuário autenticado `OWNER`. A resposta inclui
+        o código de convite.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateGroupInput"
+      responses:
+        "201":
+          description: Grupo criado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GroupSuccess"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+    get:
+      tags: [Groups]
+      operationId: listGroups
+      summary: Listar grupos do usuário
+      description: |
+        Retorna somente grupos ativos nos quais o usuário possui associação
+        ativa. O `inviteCode` é incluído apenas para `OWNER` e `ADMIN`.
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Lista paginada de grupos.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GroupListSuccess"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /api/v1/groups/join:
+    post:
+      tags: [Groups]
+      operationId: joinGroup
+      summary: Entrar em grupo por convite
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JoinGroupInput"
+      responses:
+        "201":
+          description: Usuário adicionado como `MEMBER`. O código de convite não é retornado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GroupSuccess"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: "`MEMBERSHIP_REMOVED`: usuário removido anteriormente do grupo."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: "`INVITE_NOT_FOUND`: convite inexistente ou grupo inativo."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: "`ALREADY_GROUP_MEMBER`: usuário já participa do grupo."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /api/v1/groups/{groupId}:
+    parameters:
+      - $ref: "#/components/parameters/GroupId"
+    get:
+      tags: [Groups]
+      operationId: getGroup
+      summary: Detalhar grupo
+      description: O `inviteCode` é incluído apenas para `OWNER` e `ADMIN`.
+      responses:
+        "200":
+          description: Grupo acessível pelo usuário.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GroupSuccess"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: "`GROUP_NOT_FOUND`: grupo inexistente, inativo ou inacessível."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+    patch:
+      tags: [Groups]
+      operationId: updateGroup
+      summary: Atualizar grupo
+      description: Exige papel `OWNER` ou `ADMIN`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateGroupInput"
+      responses:
+        "200":
+          description: Grupo atualizado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GroupSuccess"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/InsufficientGroupRole"
+        "404":
+          $ref: "#/components/responses/GroupNotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+    delete:
+      tags: [Groups]
+      operationId: deleteGroup
+      summary: Inativar grupo
+      description: |
+        Exige papel `OWNER`. Inativa o grupo e todas as associações ativas, sem
+        excluir fisicamente os documentos.
+      responses:
+        "200":
+          description: Grupo inativado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InactiveResourceSuccess"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/InsufficientGroupRole"
+        "404":
+          $ref: "#/components/responses/GroupNotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /api/v1/groups/{groupId}/members:
+    parameters:
+      - $ref: "#/components/parameters/GroupId"
+    get:
+      tags: [Groups]
+      operationId: listGroupMembers
+      summary: Listar membros ativos
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Lista paginada de membros.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MemberListSuccess"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/GroupNotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /api/v1/groups/{groupId}/members/{userId}/role:
+    parameters:
+      - $ref: "#/components/parameters/GroupId"
+      - $ref: "#/components/parameters/UserId"
+    patch:
+      tags: [Groups]
+      operationId: changeGroupMemberRole
+      summary: Alterar papel de membro
+      description: |
+        Exige papel `OWNER`. O novo papel pode ser somente `ADMIN` ou `MEMBER`;
+        a propriedade deve ser transferida pelo endpoint específico.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangeRoleInput"
+      responses:
+        "200":
+          description: Papel alterado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MemberSuccess"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/InsufficientGroupRole"
+        "404":
+          description: "`GROUP_NOT_FOUND` ou `GROUP_MEMBER_NOT_FOUND`."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: "`OWNER_ROLE_IMMUTABLE`: transfira a propriedade antes de alterar o papel do dono."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /api/v1/groups/{groupId}/members/{userId}:
+    parameters:
+      - $ref: "#/components/parameters/GroupId"
+      - $ref: "#/components/parameters/UserId"
+    delete:
+      tags: [Groups]
+      operationId: removeGroupMember
+      summary: Remover membro
+      description: |
+        Exige `OWNER` ou `ADMIN`. Um administrador só pode remover `MEMBER` e
+        ninguém pode remover a si mesmo. A operação remove o usuário de
+        participantes e prontidão dos itens anteriores a `PLAYING` e apaga seus
+        votos dos itens ativos.
+      responses:
+        "200":
+          description: Membro removido.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RemovedMemberSuccess"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/InsufficientGroupRole"
+        "404":
+          description: "`GROUP_NOT_FOUND` ou `GROUP_MEMBER_NOT_FOUND`."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: "`CANNOT_REMOVE_SELF`: não é permitido remover a si mesmo."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /api/v1/groups/{groupId}/transfer-owner:
+    parameters:
+      - $ref: "#/components/parameters/GroupId"
+    post:
+      tags: [Groups]
+      operationId: transferGroupOwner
+      summary: Transferir propriedade
+      description: |
+        Exige `OWNER`. O novo dono deve ser outro membro ativo. O dono anterior
+        passa a `ADMIN`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TransferOwnerInput"
+      responses:
+        "200":
+          description: Propriedade transferida. A resposta representa o grupo para o dono anterior, agora `ADMIN`.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GroupSuccess"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/InsufficientGroupRole"
+        "404":
+          description: "`GROUP_NOT_FOUND` ou `GROUP_MEMBER_NOT_FOUND`."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          description: "`VALIDATION_ERROR` ou `INVALID_OWNER_TRANSFER`."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/games:
+    post:
+      tags: [Games]
+      operationId: createGame
+      summary: Cadastrar jogo
+      description: |
+        Cadastra um jogo no catálogo global. Títulos são normalizados e únicos.
+        O usuário autenticado se torna o autor do cadastro.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateGameInput"
+      responses:
+        "201":
+          description: Jogo cadastrado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GameSuccess"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          description: "`GAME_ALREADY_EXISTS`: título normalizado já cadastrado."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+    get:
+      tags: [Games]
+      operationId: listGames
+      summary: Listar jogos ativos
+      parameters:
+        - name: search
+          in: query
+          description: Busca parcial, sem distinção entre maiúsculas e minúsculas.
+          schema:
+            type: string
+            maxLength: 120
+        - $ref: "#/components/parameters/Platform"
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Lista paginada, ordenada por título.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GameListSuccess"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /api/v1/games/{gameId}:
+    parameters:
+      - $ref: "#/components/parameters/GameId"
+    get:
+      tags: [Games]
+      operationId: getGame
+      summary: Detalhar jogo ativo
+      responses:
+        "200":
+          description: Jogo ativo.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GameSuccess"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/GameNotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+    patch:
+      tags: [Games]
+      operationId: updateGame
+      summary: Atualizar jogo
+      description: Somente o autor do cadastro pode alterar o jogo.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateGameInput"
+      responses:
+        "200":
+          description: Jogo atualizado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GameSuccess"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: "`GAME_AUTHOR_REQUIRED`: somente o autor pode alterar."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          $ref: "#/components/responses/GameNotFound"
+        "409":
+          description: "`GAME_ALREADY_EXISTS`: novo título conflita com outro jogo."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+    delete:
+      tags: [Games]
+      operationId: deactivateGame
+      summary: Inativar jogo
+      description: |
+        Somente o autor pode inativar. O jogo não é removido fisicamente e
+        continua disponível em itens do histórico.
+      responses:
+        "200":
+          description: Jogo inativado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InactiveResourceSuccess"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: "`GAME_AUTHOR_REQUIRED`: somente o autor pode alterar."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          $ref: "#/components/responses/GameNotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /api/v1/groups/{groupId}/queue:
+    parameters:
+      - $ref: "#/components/parameters/GroupId"
+    post:
+      tags: [Queue]
+      operationId: createQueueItem
+      summary: Sugerir jogo na fila
+      description: |
+        Qualquer membro ativo pode sugerir um jogo ativo. O item começa em
+        `SUGGESTED`. Um jogo não pode ter dois itens ativos no mesmo grupo.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateQueueItemInput"
+      responses:
+        "201":
+          description: Item criado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QueueItemSuccess"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: "`GROUP_NOT_FOUND` ou `GAME_NOT_FOUND`."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: "`QUEUE_ITEM_ALREADY_EXISTS`: já existe item ativo para o jogo."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+    get:
+      tags: [Queue]
+      operationId: listQueueItems
+      summary: Listar fila ativa
+      parameters:
+        - name: status
+          in: query
+          description: |
+            Um ou mais estados ativos separados por vírgula. Quando ausente,
+            inclui todos os estados ativos.
+          schema:
+            type: string
+            example: VOTING,WAITING_PLAYERS
+        - name: search
+          in: query
+          description: Busca parcial pelo título do jogo.
+          schema:
+            type: string
+            maxLength: 120
+        - $ref: "#/components/parameters/Platform"
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+        - name: sort
+          in: query
+          schema:
+            $ref: "#/components/schemas/QueueSort"
+      responses:
+        "200":
+          description: Lista paginada de itens ativos.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QueueListSuccess"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/GroupNotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /api/v1/groups/{groupId}/queue/{itemId}:
+    parameters:
+      - $ref: "#/components/parameters/GroupId"
+      - $ref: "#/components/parameters/ItemId"
+    get:
+      tags: [Queue]
+      operationId: getQueueItem
+      summary: Detalhar item ativo
+      responses:
+        "200":
+          description: Item ativo da fila.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QueueItemSuccess"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: "`GROUP_NOT_FOUND` ou `QUEUE_ITEM_NOT_FOUND`."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+    delete:
+      tags: [Queue]
+      operationId: cancelQueueItem
+      summary: Cancelar item
+      description: |
+        Exige `OWNER` ou `ADMIN`. Move qualquer item ativo para `CANCELLED`.
+        Itens `COMPLETED` e `CANCELLED` são imutáveis.
+      responses:
+        "200":
+          description: Item cancelado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QueueItemSuccess"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/InsufficientGroupRole"
+        "404":
+          description: "`GROUP_NOT_FOUND` ou `QUEUE_ITEM_NOT_FOUND`."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: "`QUEUE_ITEM_IMMUTABLE`: item concluído ou cancelado."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /api/v1/groups/{groupId}/queue/{itemId}/status:
+    parameters:
+      - $ref: "#/components/parameters/GroupId"
+      - $ref: "#/components/parameters/ItemId"
+    patch:
+      tags: [Queue]
+      operationId: transitionQueueItem
+      summary: Alterar estado do item
+      description: |
+        Exige `OWNER` ou `ADMIN`. As únicas transições públicas manuais são:
+
+        - `SUGGESTED` para `VOTING`;
+        - `READY` para `PLAYING`;
+        - `PLAYING` para `COMPLETED`.
+
+        A seleção de participantes controla `WAITING_PLAYERS`, e a prontidão
+        controla automaticamente a promoção para `READY`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TransitionQueueInput"
+      responses:
+        "200":
+          description: Estado alterado. Ao concluir, `completedAt` é preenchido.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QueueItemSuccess"
+        "400":
+          description: "`INVALID_QUEUE_TRANSITION`: transição não permitida."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/InsufficientGroupRole"
+        "404":
+          description: "`GROUP_NOT_FOUND` ou `QUEUE_ITEM_NOT_FOUND`."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: "`QUEUE_ITEM_IMMUTABLE`: item concluído ou cancelado."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /api/v1/groups/{groupId}/queue/{itemId}/participants:
+    parameters:
+      - $ref: "#/components/parameters/GroupId"
+      - $ref: "#/components/parameters/ItemId"
+    put:
+      tags: [Queue]
+      operationId: selectQueueParticipants
+      summary: Definir participantes
+      description: |
+        Exige `OWNER` ou `ADMIN` e item em `VOTING` ou `WAITING_PLAYERS`.
+        Todos os IDs devem representar membros ativos, sem duplicatas, e a
+        quantidade deve respeitar `game.maxPlayers`.
+
+        Ao selecionar durante `VOTING`, a prontidão anterior é esvaziada. Em
+        `WAITING_PLAYERS`, preserva-se a prontidão dos usuários que continuam
+        participantes. A resposta será `READY` se todos já estiverem prontos;
+        caso contrário, será `WAITING_PLAYERS`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SelectParticipantsInput"
+      responses:
+        "200":
+          description: Participantes definidos.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QueueItemSuccess"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/InsufficientGroupRole"
+        "404":
+          description: "`GROUP_NOT_FOUND` ou `QUEUE_ITEM_NOT_FOUND`."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: "`QUEUE_PARTICIPANTS_NOT_EDITABLE`: estado não permite alteração."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          description: |
+            `VALIDATION_ERROR`, `MAX_PLAYERS_EXCEEDED` ou
+            `INVALID_QUEUE_PARTICIPANTS`.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/groups/{groupId}/queue/{itemId}/ready:
+    parameters:
+      - $ref: "#/components/parameters/GroupId"
+      - $ref: "#/components/parameters/ItemId"
+    post:
+      tags: [Queue]
+      operationId: markQueueItemReady
+      summary: Marcar própria prontidão
+      description: |
+        Operação idempotente, disponível somente para participante do item em
+        `WAITING_PLAYERS` ou `READY`. Quando todos os participantes estiverem
+        prontos, o backend promove o item para `READY`.
+      responses:
+        "200":
+          description: Prontidão registrada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QueueItemSuccess"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: "`NOT_QUEUE_PARTICIPANT`: somente participantes podem alterar prontidão."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: "`GROUP_NOT_FOUND` ou `QUEUE_ITEM_NOT_FOUND`."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: "`QUEUE_READINESS_NOT_EDITABLE`: estado não permite alteração."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+    delete:
+      tags: [Queue]
+      operationId: unmarkQueueItemReady
+      summary: Retirar própria prontidão
+      description: |
+        Operação idempotente, disponível somente para participante do item em
+        `WAITING_PLAYERS` ou `READY`. O item volta para `WAITING_PLAYERS`.
+      responses:
+        "200":
+          description: Prontidão retirada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QueueItemSuccess"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: "`NOT_QUEUE_PARTICIPANT`: somente participantes podem alterar prontidão."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: "`GROUP_NOT_FOUND` ou `QUEUE_ITEM_NOT_FOUND`."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: "`QUEUE_READINESS_NOT_EDITABLE`: estado não permite alteração."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /api/v1/groups/{groupId}/queue/{itemId}/votes:
+    parameters:
+      - $ref: "#/components/parameters/GroupId"
+      - $ref: "#/components/parameters/ItemId"
+    post:
+      tags: [Votes]
+      operationId: createVote
+      summary: Criar próprio voto
+      description: |
+        Disponível somente durante `VOTING`. Cada usuário pode votar uma única
+        vez por item. O body deve ser vazio ou omitido.
+      responses:
+        "201":
+          description: Voto criado e contagem atualizada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateVoteSuccess"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: "`GROUP_NOT_FOUND` ou `QUEUE_ITEM_NOT_FOUND`."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: "`VOTE_ALREADY_EXISTS` ou `QUEUE_ITEM_NOT_VOTING`."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+    get:
+      tags: [Votes]
+      operationId: listVotes
+      summary: Listar votos do item
+      description: Os usuários retornados não incluem e-mail.
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Lista paginada de votos.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VoteListSuccess"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: "`GROUP_NOT_FOUND` ou `QUEUE_ITEM_NOT_FOUND`."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /api/v1/groups/{groupId}/queue/{itemId}/votes/me:
+    parameters:
+      - $ref: "#/components/parameters/GroupId"
+      - $ref: "#/components/parameters/ItemId"
+    delete:
+      tags: [Votes]
+      operationId: removeOwnVote
+      summary: Remover próprio voto
+      description: Disponível somente durante `VOTING`. O body deve ser vazio ou omitido.
+      responses:
+        "200":
+          description: Voto removido e contagem atualizada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RemoveVoteSuccess"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: "`GROUP_NOT_FOUND`, `QUEUE_ITEM_NOT_FOUND` ou `VOTE_NOT_FOUND`."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: "`QUEUE_ITEM_NOT_VOTING`: item fora da votação."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /api/v1/groups/{groupId}/history:
+    parameters:
+      - $ref: "#/components/parameters/GroupId"
+    get:
+      tags: [History]
+      operationId: listGroupHistory
+      summary: Consultar histórico do grupo
+      description: |
+        Retorna somente itens `COMPLETED`, em ordem decrescente de conclusão.
+        O intervalo de datas é inclusivo em UTC. Itens históricos são somente
+        leitura e permanecem disponíveis quando o jogo é inativado.
+      parameters:
+        - name: from
+          in: query
+          description: Data inicial inclusiva em UTC.
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          description: Data final inclusiva em UTC e igual ou posterior a `from`.
+          schema:
+            type: string
+            format: date
+        - name: gameId
+          in: query
+          schema:
+            $ref: "#/components/schemas/ObjectId"
+        - name: participantId
+          in: query
+          schema:
+            $ref: "#/components/schemas/ObjectId"
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Histórico paginado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HistoryListSuccess"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/GroupNotFound"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT obtido em `POST /api/v1/auth/login`.
+
+  parameters:
+    GroupId:
+      name: groupId
+      in: path
+      required: true
+      schema:
+        $ref: "#/components/schemas/ObjectId"
+    UserId:
+      name: userId
+      in: path
+      required: true
+      schema:
+        $ref: "#/components/schemas/ObjectId"
+    GameId:
+      name: gameId
+      in: path
+      required: true
+      schema:
+        $ref: "#/components/schemas/ObjectId"
+    ItemId:
+      name: itemId
+      in: path
+      required: true
+      schema:
+        $ref: "#/components/schemas/ObjectId"
+    Page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    Limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    Platform:
+      name: platform
+      in: query
+      schema:
+        $ref: "#/components/schemas/Platform"
+
+  responses:
+    Unauthorized:
+      description: |
+        `AUTH_TOKEN_REQUIRED` ou `AUTH_TOKEN_INVALID`: JWT ausente, inválido,
+        expirado ou referente a usuário inativo.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    ValidationError:
+      description: "`VALIDATION_ERROR`: body, parâmetros ou query inválidos."
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    InsufficientGroupRole:
+      description: "`INSUFFICIENT_GROUP_ROLE`: papel insuficiente para a operação."
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    GroupNotFound:
+      description: "`GROUP_NOT_FOUND`: grupo inexistente, inativo ou inacessível."
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    GameNotFound:
+      description: "`GAME_NOT_FOUND`: jogo inexistente ou inativo."
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+  schemas:
+    ObjectId:
+      type: string
+      pattern: "^[a-fA-F0-9]{24}$"
+      example: 507f1f77bcf86cd799439011
+
+    Platform:
+      type: string
+      enum: [PC, PlayStation, Xbox, Switch]
+
+    GroupRole:
+      type: string
+      enum: [OWNER, ADMIN, MEMBER]
+
+    MemberStatus:
+      type: string
+      enum: [ACTIVE, REMOVED, INACTIVE]
+
+    QueueStatus:
+      type: string
+      enum:
+        - SUGGESTED
+        - VOTING
+        - WAITING_PLAYERS
+        - READY
+        - PLAYING
+        - COMPLETED
+        - CANCELLED
+
+    ActiveQueueStatus:
+      type: string
+      enum: [SUGGESTED, VOTING, WAITING_PLAYERS, READY, PLAYING]
+
+    QueueSort:
+      type: string
+      enum: [votes_desc, created_asc, updated_desc]
+      default: votes_desc
+
+    ErrorDetail:
+      type: object
+      additionalProperties: false
+      required: [field, message]
+      properties:
+        field:
+          type: string
+          example: body.email
+        message:
+          type: string
+          example: Email invalido.
+
+    Error:
+      type: object
+      additionalProperties: false
+      required: [code, message, details]
+      properties:
+        code:
+          type: string
+          description: Código estável para tratamento programático.
+          example: VALIDATION_ERROR
+        message:
+          type: string
+          description: Mensagem legível em português.
+          example: Dados invalidos.
+        details:
+          type: array
+          items:
+            $ref: "#/components/schemas/ErrorDetail"
+
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [success, error]
+      properties:
+        success:
+          type: boolean
+          const: false
+        error:
+          $ref: "#/components/schemas/Error"
+
+    PaginationMeta:
+      type: object
+      additionalProperties: false
+      required: [page, limit, total, totalPages]
+      properties:
+        page:
+          type: integer
+          minimum: 1
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 100
+        total:
+          type: integer
+          minimum: 0
+        totalPages:
+          type: integer
+          minimum: 0
+
+    PublicUser:
+      type: object
+      additionalProperties: false
+      required: [id, name, email, avatarUrl]
+      properties:
+        id:
+          $ref: "#/components/schemas/ObjectId"
+        name:
+          type: string
+          minLength: 2
+          maxLength: 80
+          example: Ana Silva
+        email:
+          type: string
+          format: email
+          example: ana@example.com
+        avatarUrl:
+          type: [string, "null"]
+          format: uri
+
+    UserSummary:
+      type: object
+      additionalProperties: false
+      required: [id, name, avatarUrl]
+      properties:
+        id:
+          $ref: "#/components/schemas/ObjectId"
+        name:
+          type: string
+          example: Ana Silva
+        avatarUrl:
+          type: [string, "null"]
+          format: uri
+
+    Group:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - name
+        - description
+        - ownerId
+        - isActive
+        - role
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          $ref: "#/components/schemas/ObjectId"
+        name:
+          type: string
+          minLength: 3
+          maxLength: 80
+          example: Jogatina de sexta
+        description:
+          type: [string, "null"]
+          maxLength: 500
+        ownerId:
+          $ref: "#/components/schemas/ObjectId"
+        isActive:
+          type: boolean
+        role:
+          $ref: "#/components/schemas/GroupRole"
+        inviteCode:
+          type: string
+          description: Presente somente para `OWNER` e `ADMIN`.
+          example: A1B2C3D4E5F6
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    Member:
+      type: object
+      additionalProperties: false
+      required: [id, name, email, avatarUrl, role, status, joinedAt]
+      properties:
+        id:
+          $ref: "#/components/schemas/ObjectId"
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        avatarUrl:
+          type: [string, "null"]
+          format: uri
+        role:
+          $ref: "#/components/schemas/GroupRole"
+        status:
+          $ref: "#/components/schemas/MemberStatus"
+        joinedAt:
+          type: string
+          format: date-time
+
+    Game:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - title
+        - platforms
+        - maxPlayers
+        - coverUrl
+        - description
+        - createdById
+        - isActive
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          $ref: "#/components/schemas/ObjectId"
+        title:
+          type: string
+          maxLength: 120
+          example: Deep Rock Galactic
+        platforms:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            $ref: "#/components/schemas/Platform"
+        maxPlayers:
+          type: [integer, "null"]
+          minimum: 1
+          example: 4
+        coverUrl:
+          type: [string, "null"]
+          format: uri
+        description:
+          type: [string, "null"]
+          maxLength: 1000
+        createdById:
+          $ref: "#/components/schemas/ObjectId"
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    QueueGame:
+      type: object
+      additionalProperties: false
+      required: [id, title, platforms, maxPlayers, coverUrl]
+      properties:
+        id:
+          $ref: "#/components/schemas/ObjectId"
+        title:
+          type: string
+        platforms:
+          type: array
+          items:
+            $ref: "#/components/schemas/Platform"
+        maxPlayers:
+          type: [integer, "null"]
+          minimum: 1
+        coverUrl:
+          type: [string, "null"]
+          format: uri
+
+    QueueItem:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - groupId
+        - game
+        - suggestedBy
+        - status
+        - voteCount
+        - participantIds
+        - readyUserIds
+        - completedAt
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          $ref: "#/components/schemas/ObjectId"
+        groupId:
+          $ref: "#/components/schemas/ObjectId"
+        game:
+          $ref: "#/components/schemas/QueueGame"
+        suggestedBy:
+          $ref: "#/components/schemas/UserSummary"
+        status:
+          $ref: "#/components/schemas/QueueStatus"
+        voteCount:
+          type: integer
+          minimum: 0
+        participantIds:
+          type: array
+          uniqueItems: true
+          items:
+            $ref: "#/components/schemas/ObjectId"
+        readyUserIds:
+          type: array
+          uniqueItems: true
+          description: Sempre é subconjunto de `participantIds`.
+          items:
+            $ref: "#/components/schemas/ObjectId"
+        completedAt:
+          type: [string, "null"]
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    Vote:
+      type: object
+      additionalProperties: false
+      required: [id, user, createdAt]
+      properties:
+        id:
+          $ref: "#/components/schemas/ObjectId"
+        user:
+          $ref: "#/components/schemas/UserSummary"
+        createdAt:
+          type: string
+          format: date-time
+
+    RegisterInput:
+      type: object
+      additionalProperties: false
+      required: [name, email, password]
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 80
+        email:
+          type: string
+          format: email
+          description: Normalizado para minúsculas.
+        password:
+          type: string
+          format: password
+          minLength: 8
+          maxLength: 72
+          description: |
+            Deve conter letra minúscula, letra maiúscula e número. O limite
+            efetivo é de 72 bytes UTF-8.
+
+    LoginInput:
+      type: object
+      additionalProperties: false
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+          minLength: 1
+
+    CreateGroupInput:
+      type: object
+      additionalProperties: false
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 3
+          maxLength: 80
+        description:
+          type: [string, "null"]
+          maxLength: 500
+
+    UpdateGroupInput:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        name:
+          type: string
+          minLength: 3
+          maxLength: 80
+        description:
+          type: [string, "null"]
+          maxLength: 500
+
+    JoinGroupInput:
+      type: object
+      additionalProperties: false
+      required: [inviteCode]
+      properties:
+        inviteCode:
+          type: string
+          minLength: 1
+          maxLength: 32
+          description: Comparado sem distinção entre maiúsculas e minúsculas.
+
+    ChangeRoleInput:
+      type: object
+      additionalProperties: false
+      required: [role]
+      properties:
+        role:
+          type: string
+          enum: [ADMIN, MEMBER]
+
+    TransferOwnerInput:
+      type: object
+      additionalProperties: false
+      required: [newOwnerId]
+      properties:
+        newOwnerId:
+          $ref: "#/components/schemas/ObjectId"
+
+    CreateGameInput:
+      type: object
+      additionalProperties: false
+      required: [title, platforms]
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 120
+        platforms:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            $ref: "#/components/schemas/Platform"
+        maxPlayers:
+          type: [integer, "null"]
+          minimum: 1
+        coverUrl:
+          type: [string, "null"]
+          format: uri
+        description:
+          type: [string, "null"]
+          maxLength: 1000
+
+    UpdateGameInput:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 120
+        platforms:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            $ref: "#/components/schemas/Platform"
+        maxPlayers:
+          type: [integer, "null"]
+          minimum: 1
+        coverUrl:
+          type: [string, "null"]
+          format: uri
+        description:
+          type: [string, "null"]
+          maxLength: 1000
+
+    CreateQueueItemInput:
+      type: object
+      additionalProperties: false
+      required: [gameId]
+      properties:
+        gameId:
+          $ref: "#/components/schemas/ObjectId"
+
+    TransitionQueueInput:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [VOTING, PLAYING, COMPLETED]
+
+    SelectParticipantsInput:
+      type: object
+      additionalProperties: false
+      required: [participantIds]
+      properties:
+        participantIds:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            $ref: "#/components/schemas/ObjectId"
+
+    HealthSuccess:
+      type: object
+      additionalProperties: false
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          type: object
+          additionalProperties: false
+          required: [message]
+          properties:
+            message:
+              type: string
+              example: API Fillobby em funcionamento!
+
+    UserSuccess:
+      type: object
+      additionalProperties: false
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          $ref: "#/components/schemas/PublicUser"
+
+    CurrentUserSuccess:
+      type: object
+      additionalProperties: false
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          type: object
+          additionalProperties: false
+          required: [user]
+          properties:
+            user:
+              $ref: "#/components/schemas/PublicUser"
+
+    LoginSuccess:
+      type: object
+      additionalProperties: false
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          type: object
+          additionalProperties: false
+          required: [token, user]
+          properties:
+            token:
+              type: string
+              description: JWT assinado com HS256.
+            user:
+              $ref: "#/components/schemas/PublicUser"
+
+    GroupSuccess:
+      type: object
+      additionalProperties: false
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          $ref: "#/components/schemas/Group"
+
+    GroupListSuccess:
+      type: object
+      additionalProperties: false
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          type: object
+          additionalProperties: false
+          required: [groups, meta]
+          properties:
+            groups:
+              type: array
+              items:
+                $ref: "#/components/schemas/Group"
+            meta:
+              $ref: "#/components/schemas/PaginationMeta"
+
+    MemberSuccess:
+      type: object
+      additionalProperties: false
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          $ref: "#/components/schemas/Member"
+
+    MemberListSuccess:
+      type: object
+      additionalProperties: false
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          type: object
+          additionalProperties: false
+          required: [members, meta]
+          properties:
+            members:
+              type: array
+              items:
+                $ref: "#/components/schemas/Member"
+            meta:
+              $ref: "#/components/schemas/PaginationMeta"
+
+    RemovedMemberSuccess:
+      type: object
+      additionalProperties: false
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          type: object
+          additionalProperties: false
+          required: [userId, status]
+          properties:
+            userId:
+              $ref: "#/components/schemas/ObjectId"
+            status:
+              type: string
+              const: REMOVED
+
+    InactiveResourceSuccess:
+      type: object
+      additionalProperties: false
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          type: object
+          additionalProperties: false
+          required: [id, isActive]
+          properties:
+            id:
+              $ref: "#/components/schemas/ObjectId"
+            isActive:
+              type: boolean
+              const: false
+
+    GameSuccess:
+      type: object
+      additionalProperties: false
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          $ref: "#/components/schemas/Game"
+
+    GameListSuccess:
+      type: object
+      additionalProperties: false
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          type: object
+          additionalProperties: false
+          required: [games, meta]
+          properties:
+            games:
+              type: array
+              items:
+                $ref: "#/components/schemas/Game"
+            meta:
+              $ref: "#/components/schemas/PaginationMeta"
+
+    QueueItemSuccess:
+      type: object
+      additionalProperties: false
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          $ref: "#/components/schemas/QueueItem"
+
+    QueueListSuccess:
+      type: object
+      additionalProperties: false
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          type: object
+          additionalProperties: false
+          required: [queueItems, meta]
+          properties:
+            queueItems:
+              type: array
+              items:
+                $ref: "#/components/schemas/QueueItem"
+            meta:
+              $ref: "#/components/schemas/PaginationMeta"
+
+    CreateVoteSuccess:
+      type: object
+      additionalProperties: false
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          type: object
+          additionalProperties: false
+          required: [vote, voteCount]
+          properties:
+            vote:
+              $ref: "#/components/schemas/Vote"
+            voteCount:
+              type: integer
+              minimum: 1
+
+    RemoveVoteSuccess:
+      type: object
+      additionalProperties: false
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          type: object
+          additionalProperties: false
+          required: [queueItemId, voteCount]
+          properties:
+            queueItemId:
+              $ref: "#/components/schemas/ObjectId"
+            voteCount:
+              type: integer
+              minimum: 0
+
+    VoteListSuccess:
+      type: object
+      additionalProperties: false
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          type: object
+          additionalProperties: false
+          required: [votes, meta]
+          properties:
+            votes:
+              type: array
+              items:
+                $ref: "#/components/schemas/Vote"
+            meta:
+              $ref: "#/components/schemas/PaginationMeta"
+
+    HistoryListSuccess:
+      type: object
+      additionalProperties: false
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          type: object
+          additionalProperties: false
+          required: [historyItems, meta]
+          properties:
+            historyItems:
+              type: array
+              items:
+                $ref: "#/components/schemas/QueueItem"
+            meta:
+              $ref: "#/components/schemas/PaginationMeta"

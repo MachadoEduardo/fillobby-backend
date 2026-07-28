@@ -14,6 +14,11 @@ As rotas de autenticação estão disponíveis em `/api/v1/auth`:
 - `POST /login` para obter um JWT;
 - `GET /me` com `Authorization: Bearer <token>` para consultar o usuário autenticado.
 
+O contrato completo da API para integração com clientes está em
+[`docs/openapi.yaml`](docs/openapi.yaml). A especificação usa OpenAPI 3.1 e
+documenta autenticação, entradas, respostas, paginação, regras e erros dos
+endpoints atuais.
+
 As rotas de grupos estão disponíveis em `/api/v1/groups`:
 
 - `POST /` para criar um grupo;
