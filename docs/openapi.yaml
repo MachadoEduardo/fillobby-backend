@@ -23,6 +23,7 @@ servers:
 tags:
   - name: Health
   - name: Auth
+  - name: Profile
   - name: Groups
   - name: Games
   - name: Queue
@@ -125,6 +126,122 @@ paths:
                 $ref: "#/components/schemas/CurrentUserSuccess"
         "401":
           $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/profile:
+    patch:
+      tags: [Profile]
+      operationId: updateOwnProfile
+      summary: Atualizar o proprio perfil
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProfileInput"
+      responses:
+        "200":
+          description: Perfil atualizado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserSuccess"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /api/v1/profile/avatar:
+    put:
+      tags: [Profile]
+      operationId: uploadOwnAvatar
+      summary: Enviar ou substituir o proprio avatar
+      description: Aceita JPEG, PNG ou WebP com no maximo 2 MiB.
+      requestBody:
+        required: true
+        content:
+          image/jpeg:
+            schema:
+              type: string
+              format: binary
+          image/png:
+            schema:
+              type: string
+              format: binary
+          image/webp:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "200":
+          description: Avatar atualizado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserSuccess"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "413":
+          description: "`AVATAR_TOO_LARGE`: imagem maior que 2 MiB."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "415":
+          description: "`UNSUPPORTED_IMAGE_TYPE`: conteudo nao corresponde a JPEG, PNG ou WebP."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      tags: [Profile]
+      operationId: removeOwnAvatar
+      summary: Remover o proprio avatar
+      responses:
+        "200":
+          description: Avatar removido.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserSuccess"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/profile/avatars/{userId}:
+    get:
+      tags: [Profile]
+      operationId: getUserAvatar
+      summary: Consultar o avatar de um usuario
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      responses:
+        "200":
+          description: Conteudo binario do avatar.
+          headers:
+            ETag:
+              schema:
+                type: string
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+            image/png:
+              schema:
+                type: string
+                format: binary
+            image/webp:
+              schema:
+                type: string
+                format: binary
+        "304":
+          description: Avatar nao modificado.
+        "404":
+          description: "`AVATAR_NOT_FOUND`: avatar inexistente."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
   /api/v1/groups:
     post:
@@ -1488,6 +1605,16 @@ components:
           type: string
           format: password
           minLength: 1
+
+    UpdateProfileInput:
+      type: object
+      additionalProperties: false
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 80
 
     CreateGroupInput:
       type: object

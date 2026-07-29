@@ -10,6 +10,7 @@ import gamesRoutes from './src/modules/games/games.routes.js';
 import queueRoutes from './src/modules/queue/queue.routes.js';
 import votesRoutes from './src/modules/votes/votes.routes.js';
 import historyRoutes from './src/modules/history/history.routes.js';
+import profileRoutes from './src/modules/profile/profile.routes.js';
 import { errorMiddleware, notFoundMiddleware } from './src/middlewares/error.middleware.js';
 
 const app = express();
@@ -29,6 +30,7 @@ app.use(express.json());
 
 app.get('/', (req, res) => res.status(200).json({ success: true, data: { message: 'API Fillobby em funcionamento!' } }));
 app.use('/api/v1/auth', authRoutes);
+app.use('/api/v1/profile', profileRoutes);
 app.use('/api/v1/groups/:groupId/history', historyRoutes);
 app.use('/api/v1/groups', groupsRoutes);
 app.use('/api/v1/games', gamesRoutes);
