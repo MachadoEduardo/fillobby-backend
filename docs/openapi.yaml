@@ -653,7 +653,8 @@ paths:
       summary: Cadastrar jogo
       description: |
         Cadastra um jogo no catálogo global. Títulos são normalizados e únicos.
-        O usuário autenticado se torna o autor do cadastro.
+        O usuário autenticado se torna o autor do cadastro. Se um título igual
+        existir apenas como inativo, o registro é reativado sem criar duplicata.
       requestBody:
         required: true
         content:
@@ -666,7 +667,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/GameSuccess"
+                $ref: "#/components/schemas/CreateGameSuccess"
+        "200":
+          description: Jogo inativo existente reativado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateGameSuccess"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "409":
@@ -2050,6 +2057,24 @@ components:
           const: true
         data:
           $ref: "#/components/schemas/Game"
+
+    CreateGameSuccess:
+      type: object
+      additionalProperties: false
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          type: object
+          additionalProperties: false
+          required: [game, reactivated]
+          properties:
+            game:
+              $ref: "#/components/schemas/Game"
+            reactivated:
+              type: boolean
 
     GameListSuccess:
       type: object

@@ -50,7 +50,14 @@ function requireAuthor(game, userId) {
 
 export async function createGame({ userId, data }) {
   const normalizedTitle = normalizeTitle(data.title);
-  if (await Game.exists({ normalizedTitle })) throw duplicateGameError();
+  const existingGame = await Game.findOne({ normalizedTitle });
+  if (existingGame) {
+    if (existingGame.isActive) throw duplicateGameError();
+
+    existingGame.isActive = true;
+    await existingGame.save();
+    return { game: serializeGame(existingGame), reactivated: true };
+  }
 
   try {
     const game = await Game.create({
@@ -58,7 +65,7 @@ export async function createGame({ userId, data }) {
       normalizedTitle,
       createdBy: userId,
     });
-    return serializeGame(game);
+    return { game: serializeGame(game), reactivated: false };
   } catch (error) {
     if (error?.code === 11000 && error.keyPattern?.normalizedTitle)
       throw duplicateGameError();

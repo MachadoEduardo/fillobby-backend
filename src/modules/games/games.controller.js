@@ -6,7 +6,9 @@ export async function create(req, res, next) {
       userId: req.user._id,
       data: req.body,
     });
-    return res.status(201).json({ success: true, data });
+    return res
+      .status(data.reactivated ? 200 : 201)
+      .json({ success: true, data });
   } catch (error) {
     return next(error);
   }

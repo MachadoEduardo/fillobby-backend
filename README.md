@@ -34,7 +34,8 @@ As rotas de grupos estão disponíveis em `/api/v1/groups`:
 
 As rotas do catálogo de jogos estão disponíveis em `/api/v1/games`:
 
-- `POST /` para cadastrar um jogo, rejeitando títulos normalizados duplicados;
+- `POST /` para cadastrar um jogo; se um título normalizado existir apenas
+  como inativo, o registro é reativado. Duplicatas ativas são rejeitadas;
 - `GET /` para listar jogos ativos com busca, plataforma e paginação;
 - `GET /:gameId` para detalhar um jogo ativo;
 - `PATCH /:gameId` para o autor editar o jogo;

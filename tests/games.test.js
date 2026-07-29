@@ -83,18 +83,24 @@ integration("games integration", () => {
       });
     expect(response.status).toBe(201);
     expect(response.body.data).toMatchObject({
-      title: "It Takes Two",
-      platforms: ["PC", "PlayStation"],
-      maxPlayers: 2,
-      createdById: user._id.toString(),
-      isActive: true,
+      reactivated: false,
+      game: {
+        title: "It Takes Two",
+        platforms: ["PC", "PlayStation"],
+        maxPlayers: 2,
+        createdById: user._id.toString(),
+        isActive: true,
+      },
     });
     expect(
-      await Game.exists({ _id: response.body.data.id, createdBy: user._id }),
+      await Game.exists({
+        _id: response.body.data.game.id,
+        createdBy: user._id,
+      }),
     ).toBeTruthy();
   });
 
-  it("rejects duplicated normalized titles", async () => {
+  it("rejects duplicated normalized titles for active games", async () => {
     const { token } = await createAuthenticatedUser(
       "Game Author",
       "author@example.com",
@@ -111,6 +117,43 @@ integration("games integration", () => {
     expect(duplicate.status).toBe(409);
     expect(duplicate.body.error.code).toBe("GAME_ALREADY_EXISTS");
     expect(await Game.countDocuments({})).toBe(1);
+  });
+
+  it("reactivates an inactive game instead of creating a duplicate", async () => {
+    const { user, token } = await createAuthenticatedUser(
+      "Game Author",
+      "author@example.com",
+    );
+    const inactiveGame = await Game.create({
+      title: "Portal 2",
+      normalizedTitle: "portal 2",
+      platforms: ["PC"],
+      maxPlayers: 2,
+      createdBy: user._id,
+      isActive: false,
+    });
+
+    const response = await request(app)
+      .post("/api/v1/games")
+      .set("Authorization", `Bearer ${token}`)
+      .send({
+        title: "  portal   2 ",
+        platforms: ["Switch"],
+        maxPlayers: 4,
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.data).toMatchObject({
+      reactivated: true,
+      game: {
+        id: inactiveGame._id.toString(),
+        title: "Portal 2",
+        platforms: ["PC"],
+        maxPlayers: 2,
+        isActive: true,
+      },
+    });
+    expect(await Game.countDocuments({ normalizedTitle: "portal 2" })).toBe(1);
   });
 
   it("protects normalized titles with a unique database index", async () => {
