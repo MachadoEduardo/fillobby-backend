@@ -11,6 +11,7 @@ import {
   QUEUE_STATUS,
 } from "./queue.constants.js";
 import { serializeQueueItem } from "./queue.serializer.js";
+import { findViewerVoteItemIds } from "./queue.viewer.js";
 
 function escapeRegex(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -27,6 +28,15 @@ async function populateItem(item) {
     { path: "participants", select: "name avatarUrl" },
   ]);
   return item;
+}
+
+async function serializeItemForViewer(item, userId) {
+  const populatedItem = await populateItem(item);
+  const votedItemIds = await findViewerVoteItemIds([populatedItem], userId);
+
+  return serializeQueueItem(populatedItem, {
+    viewerHasVoted: votedItemIds.has(id(populatedItem._id)),
+  });
 }
 
 function requireAdmin(membership) {
@@ -96,7 +106,7 @@ export async function createQueueItem({ groupId, userId, gameId }) {
       suggestedBy: userId,
       status: QUEUE_STATUS.SUGGESTED,
     });
-    return serializeQueueItem(await populateItem(item));
+    return serializeItemForViewer(item, userId);
   } catch (error) {
     if (error?.code === 11000) throw duplicateQueueItemError();
     throw error;
@@ -143,17 +153,23 @@ export async function listQueueItems({
       .skip((page - 1) * limit)
       .limit(limit),
   ]);
+  const votedItemIds = await findViewerVoteItemIds(items, userId);
 
   return {
-    queueItems: items.map(serializeQueueItem),
+    queueItems: items.map((item) =>
+      serializeQueueItem(item, {
+        viewerHasVoted: votedItemIds.has(id(item._id)),
+      }),
+    ),
     meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
   };
 }
 
 export async function getQueueItem({ groupId, userId, itemId }) {
   const { group } = await getActiveGroupContext(groupId, userId);
-  return serializeQueueItem(
-    await populateItem(await findQueueItem(group._id, itemId)),
+  return serializeItemForViewer(
+    await findQueueItem(group._id, itemId),
+    userId,
   );
 }
 
@@ -188,7 +204,7 @@ export async function transitionQueueItem({
   item.completedAt =
     targetStatus === QUEUE_STATUS.COMPLETED ? new Date() : null;
   await item.save();
-  return serializeQueueItem(await populateItem(item));
+  return serializeItemForViewer(item, userId);
 }
 
 export async function selectQueueParticipants({
@@ -270,7 +286,7 @@ export async function selectQueueParticipants({
   );
 
   if (!updatedItem) throw participantsNotEditableError();
-  return serializeQueueItem(await populateItem(updatedItem));
+  return serializeItemForViewer(updatedItem, userId);
 }
 
 export async function setQueueReadiness({ groupId, userId, itemId, isReady }) {
@@ -338,7 +354,7 @@ export async function setQueueReadiness({ groupId, userId, itemId, isReady }) {
     );
   }
 
-  return serializeQueueItem(await populateItem(updatedItem));
+  return serializeItemForViewer(updatedItem, userId);
 }
 
 export async function cancelQueueItem({ groupId, userId, itemId }) {
@@ -354,5 +370,5 @@ export async function cancelQueueItem({ groupId, userId, itemId }) {
   item.status = QUEUE_STATUS.CANCELLED;
   item.completedAt = null;
   await item.save();
-  return serializeQueueItem(await populateItem(item));
+  return serializeItemForViewer(item, userId);
 }

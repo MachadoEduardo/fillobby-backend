@@ -14,7 +14,7 @@ function serializeUserSummary(user) {
   };
 }
 
-export function serializeQueueItem(item) {
+export function serializeQueueItem(item, { viewerHasVoted = false } = {}) {
   const game = item.game;
   const suggestedBy = item.suggestedBy;
 
@@ -31,6 +31,7 @@ export function serializeQueueItem(item) {
     suggestedBy: serializeUserSummary(suggestedBy),
     status: item.status,
     voteCount: item.voteCount,
+    viewerHasVoted,
     participantIds: item.participants.map(referenceId),
     participants: item.participants.map(serializeUserSummary),
     readyUserIds: item.readyUsers.map(referenceId),

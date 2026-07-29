@@ -2,6 +2,7 @@ import QueueItem from "../../models/QueueItem.js";
 import { getActiveGroupContext } from "../groups/groups.service.js";
 import { QUEUE_STATUS } from "../queue/queue.constants.js";
 import { serializeQueueItem } from "../queue/queue.serializer.js";
+import { findViewerVoteItemIds } from "../queue/queue.viewer.js";
 
 function startOfUtcDay(value) {
   return new Date(`${value}T00:00:00.000Z`);
@@ -45,9 +46,14 @@ export async function listHistory({
       .skip((page - 1) * limit)
       .limit(limit),
   ]);
+  const votedItemIds = await findViewerVoteItemIds(items, userId);
 
   return {
-    historyItems: items.map(serializeQueueItem),
+    historyItems: items.map((item) =>
+      serializeQueueItem(item, {
+        viewerHasVoted: votedItemIds.has(item._id.toString()),
+      }),
+    ),
     meta: {
       page,
       limit,

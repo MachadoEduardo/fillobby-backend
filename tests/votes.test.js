@@ -165,6 +165,26 @@ integration("votes integration", () => {
     expect((await QueueItem.findById(item._id)).voteCount).toBe(1);
   });
 
+  it("reports whether the authenticated user has voted in queue responses", async () => {
+    const { owner, member, group, item } = await createContext();
+    await request(app)
+      .post(votesPath(group._id, item._id))
+      .set("Authorization", `Bearer ${member.token}`)
+      .send({});
+
+    const memberQueue = await request(app)
+      .get(`/api/v1/groups/${group._id}/queue`)
+      .set("Authorization", `Bearer ${member.token}`);
+    const ownerQueue = await request(app)
+      .get(`/api/v1/groups/${group._id}/queue`)
+      .set("Authorization", `Bearer ${owner.token}`);
+
+    expect(memberQueue.status).toBe(200);
+    expect(memberQueue.body.data.queueItems[0].viewerHasVoted).toBe(true);
+    expect(ownerQueue.status).toBe(200);
+    expect(ownerQueue.body.data.queueItems[0].viewerHasVoted).toBe(false);
+  });
+
   it("protects vote uniqueness with a database index", async () => {
     await Vote.init();
     const indexes = await Vote.collection.indexes();

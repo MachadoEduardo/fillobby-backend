@@ -1613,6 +1613,7 @@ components:
         - suggestedBy
         - status
         - voteCount
+        - viewerHasVoted
         - participantIds
         - participants
         - readyUserIds
@@ -1633,6 +1634,9 @@ components:
         voteCount:
           type: integer
           minimum: 0
+        viewerHasVoted:
+          type: boolean
+          description: Indica se o usuário autenticado já votou neste item.
         participantIds:
           type: array
           uniqueItems: true
