@@ -1,5 +1,8 @@
+import bcrypt from "bcrypt";
 import mongoose from "mongoose";
+import User from "../../models/User.js";
 import UserAvatar from "../../models/UserAvatar.js";
+import env from "../../config/env.js";
 import { serializeUser } from "../auth/auth.service.js";
 import AppError from "../../shared/errors/AppError.js";
 
@@ -34,6 +37,27 @@ export async function updateProfile({ user, name }) {
   user.name = name;
   await user.save();
   return serializeUser(user);
+}
+
+export async function changePassword({ user, currentPassword, newPassword }) {
+  const currentUser = await User.findById(user._id).select("+passwordHash");
+  if (!currentUser || !currentUser.isActive)
+    throw new AppError("USER_NOT_FOUND", "Usuario nao encontrado.", 404);
+
+  const isCurrentPasswordValid = await bcrypt.compare(
+    currentPassword,
+    currentUser.passwordHash,
+  );
+  if (!isCurrentPasswordValid)
+    throw new AppError(
+      "INVALID_CURRENT_PASSWORD",
+      "Senha atual incorreta.",
+      401,
+    );
+
+  currentUser.passwordHash = await bcrypt.hash(newPassword, env.bcryptRounds);
+  await currentUser.save();
+  return serializeUser(currentUser);
 }
 
 export async function uploadAvatar({ user, data, contentType }) {

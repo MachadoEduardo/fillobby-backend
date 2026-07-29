@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-const password = z
+export const passwordSchema = z
   .string()
   .min(8, "Senha deve ser maior ou igual a 8 caracteres")
   .refine(
@@ -26,7 +26,7 @@ export const registerSchema = base.extend({
         .min(2, "Nome deve ser maior ou igual a 2 caracteres")
         .max(80, "Nome deve ser menor ou igual a 80 caracteres"),
       email: z.string().trim().toLowerCase().email("Email invalido"),
-      password,
+      password: passwordSchema,
     })
     .strict(),
 });

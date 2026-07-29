@@ -12,6 +12,19 @@ export async function update(req, res, next) {
   }
 }
 
+export async function changePassword(req, res, next) {
+  try {
+    const data = await profileService.changePassword({
+      user: req.user,
+      currentPassword: req.body.currentPassword,
+      newPassword: req.body.newPassword,
+    });
+    return res.status(200).json({ success: true, data });
+  } catch (error) {
+    return next(error);
+  }
+}
+
 export async function uploadAvatar(req, res, next) {
   try {
     const data = await profileService.uploadAvatar({

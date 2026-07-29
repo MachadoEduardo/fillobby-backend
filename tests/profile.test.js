@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import mongoose from "mongoose";
 import request from "supertest";
@@ -12,6 +13,19 @@ describe("profile contract", () => {
     const response = await request(app)
       .patch("/api/v1/profile")
       .send({ name: "Novo nome" });
+
+    expect(response.status).toBe(401);
+    expect(response.body.error.code).toBe("AUTH_TOKEN_REQUIRED");
+  });
+
+  it("requires authentication to change the password", async () => {
+    const response = await request(app)
+      .patch("/api/v1/profile/password")
+      .send({
+        currentPassword: "SenhaAntiga123",
+        newPassword: "NovaSenha123",
+        confirmPassword: "NovaSenha123",
+      });
 
     expect(response.status).toBe(401);
     expect(response.body.error.code).toBe("AUTH_TOKEN_REQUIRED");
@@ -31,10 +45,11 @@ integration("profile integration", () => {
 
   beforeEach(async () => {
     await Promise.all([User.deleteMany({}), UserAvatar.deleteMany({})]);
+    const passwordHash = await bcrypt.hash("SenhaAntiga123", env.bcryptRounds);
     user = await User.create({
       name: "Ana Silva",
       email: "ana@email.com",
-      passwordHash: "hash-nao-utilizado",
+      passwordHash,
     });
     token = jwt.sign({}, env.jwtSecret, {
       subject: user._id.toString(),
@@ -78,6 +93,42 @@ integration("profile integration", () => {
     expect(invalidName.body.error.code).toBe("VALIDATION_ERROR");
     expect(forbiddenField.status).toBe(422);
     expect(forbiddenField.body.error.code).toBe("VALIDATION_ERROR");
+  });
+
+  it("changes the password when the current password is correct and the confirmation matches", async () => {
+    const response = await request(app)
+      .patch("/api/v1/profile/password")
+      .set("Authorization", `Bearer ${token}`)
+      .send({
+        currentPassword: "SenhaAntiga123",
+        newPassword: "NovaSenha123",
+        confirmPassword: "NovaSenha123",
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.data).toMatchObject({
+      id: user._id.toString(),
+      name: "Ana Silva",
+      email: "ana@email.com",
+    });
+
+    const storedUser = await User.findById(user._id).select("+passwordHash");
+    expect(await bcrypt.compare("SenhaAntiga123", storedUser.passwordHash)).toBe(false);
+    expect(await bcrypt.compare("NovaSenha123", storedUser.passwordHash)).toBe(true);
+  });
+
+  it("rejects a password change when the new password confirmation does not match", async () => {
+    const response = await request(app)
+      .patch("/api/v1/profile/password")
+      .set("Authorization", `Bearer ${token}`)
+      .send({
+        currentPassword: "SenhaAntiga123",
+        newPassword: "NovaSenha123",
+        confirmPassword: "Diferente123",
+      });
+
+    expect(response.status).toBe(422);
+    expect(response.body.error.code).toBe("VALIDATION_ERROR");
   });
 
   it("uploads, serves and replaces the avatar without duplicating it", async () => {
