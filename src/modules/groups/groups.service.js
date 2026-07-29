@@ -5,19 +5,16 @@ import GroupMember from "../../models/GroupMember.js";
 import QueueItem from "../../models/QueueItem.js";
 import Vote from "../../models/Vote.js";
 import AppError from "../../shared/errors/AppError.js";
+import {
+  ACTIVE_QUEUE_STATUSES,
+  QUEUE_STATUS,
+} from "../queue/queue.constants.js";
 
-const ACTIVE_QUEUE_STATUSES = [
-  "SUGGESTED",
-  "VOTING",
-  "WAITING_PLAYERS",
-  "READY",
-  "PLAYING",
-];
 const PRE_PLAYING_STATUSES = [
-  "SUGGESTED",
-  "VOTING",
-  "WAITING_PLAYERS",
-  "READY",
+  QUEUE_STATUS.SUGGESTED,
+  QUEUE_STATUS.VOTING,
+  QUEUE_STATUS.WAITING_PLAYERS,
+  QUEUE_STATUS.READY,
 ];
 
 function inviteCode() {
@@ -102,6 +99,84 @@ function requireRole(membership, roles) {
       "Voce nao possui permissao para esta operacao.",
       403,
     );
+}
+
+async function deactivateMembership({ group, membership, userId, status, session }) {
+  const targetUserId = new mongoose.Types.ObjectId(id(userId));
+
+  membership.status = status;
+  membership.role = "MEMBER";
+  await membership.save({ session });
+
+  await QueueItem.updateMany(
+    { group: group._id, status: { $in: PRE_PLAYING_STATUSES } },
+    [
+      {
+        $set: {
+          participants: { $setDifference: ["$participants", [targetUserId]] },
+          readyUsers: { $setDifference: ["$readyUsers", [targetUserId]] },
+        },
+      },
+      {
+        $set: {
+          status: {
+            $cond: [
+              {
+                $in: [
+                  "$status",
+                  [QUEUE_STATUS.WAITING_PLAYERS, QUEUE_STATUS.READY],
+                ],
+              },
+              {
+                $cond: [
+                  {
+                    $and: [
+                      { $gt: [{ $size: "$participants" }, 0] },
+                      { $setEquals: ["$participants", "$readyUsers"] },
+                    ],
+                  },
+                  QUEUE_STATUS.READY,
+                  QUEUE_STATUS.WAITING_PLAYERS,
+                ],
+              },
+              "$status",
+            ],
+          },
+        },
+      },
+    ],
+    { session, updatePipeline: true },
+  );
+
+  const items = await QueueItem.find({
+    group: group._id,
+    status: { $in: ACTIVE_QUEUE_STATUSES },
+  })
+    .select("_id")
+    .session(session);
+  const itemIds = items.map((item) => item._id);
+  const votes = await Vote.find({
+    user: targetUserId,
+    queueItem: { $in: itemIds },
+  })
+    .select("queueItem")
+    .session(session);
+
+  if (!votes.length) return;
+
+  await Vote.deleteMany(
+    { _id: { $in: votes.map((vote) => vote._id) } },
+    { session },
+  );
+  await QueueItem.bulkWrite(
+    votes.map((vote) => ({
+      updateOne: {
+        filter: { _id: vote.queueItem, voteCount: { $gt: 0 } },
+        update: { $inc: { voteCount: -1 } },
+      },
+    })),
+    { session },
+  );
 }
 
 export async function createGroup({ userId, name, description }) {
@@ -253,9 +328,11 @@ export async function joinGroup({ userId, inviteCode: code }) {
   }
 }
 
-export async function listMembers({ groupId, userId, page, limit }) {
-  const { group } = await getActiveGroupContext(groupId, userId);
-  const query = { group: group._id, status: "ACTIVE" };
+export async function listMembers({ groupId, userId, page, limit, status }) {
+  const { group, membership } = await getActiveGroupContext(groupId, userId);
+  if (status === "REMOVED") requireRole(membership, ["OWNER", "ADMIN"]);
+
+  const query = { group: group._id, status };
   const [total, members] = await Promise.all([
     GroupMember.countDocuments(query),
     GroupMember.find(query)
@@ -326,48 +403,82 @@ export async function removeMember({ groupId, userId, targetUserId }) {
     );
 
   await transaction(async (session) => {
-    target.status = "REMOVED";
-    target.role = "MEMBER";
-    await target.save({ session });
-    await QueueItem.updateMany(
-      { group: group._id, status: { $in: PRE_PLAYING_STATUSES } },
-      { $pull: { participants: targetUserId, readyUsers: targetUserId } },
-      { session },
-    );
-
-    const items = await QueueItem.find({
-      group: group._id,
-      status: { $in: ACTIVE_QUEUE_STATUSES },
-    })
-      .select("_id")
-      .session(session);
-
-    const itemIds = items.map((item) => item._id);
-    const votes = await Vote.find({
-      user: targetUserId,
-      queueItem: { $in: itemIds },
-    })
-      .select("queueItem")
-      .session(session);
-
-    if (votes.length) {
-      await Vote.deleteMany(
-        { _id: { $in: votes.map((vote) => vote._id) } },
-        { session },
-      );
-      await QueueItem.bulkWrite(
-        votes.map((vote) => ({
-          updateOne: {
-            filter: { _id: vote.queueItem, voteCount: { $gt: 0 } },
-            update: { $inc: { voteCount: -1 } },
-          },
-        })),
-        { session },
-      );
-    }
+    await deactivateMembership({
+      group,
+      membership: target,
+      userId: targetUserId,
+      status: "REMOVED",
+      session,
+    });
   });
 
   return { userId: id(targetUserId), status: "REMOVED" };
+}
+
+export async function leaveGroup({ groupId, userId }) {
+  const { group, membership } = await getActiveGroupContext(groupId, userId);
+  if (membership.role === "OWNER") {
+    throw new AppError(
+      "OWNER_CANNOT_LEAVE",
+      "Transfira a propriedade ou exclua o grupo antes de sair.",
+      409,
+    );
+  }
+
+  await transaction(async (session) => {
+    await deactivateMembership({
+      group,
+      membership,
+      userId,
+      status: "INACTIVE",
+      session,
+    });
+  });
+
+  return { userId: id(userId), status: "INACTIVE" };
+}
+
+export async function restoreMember({ groupId, userId, targetUserId }) {
+  const { group, membership } = await getActiveGroupContext(groupId, userId);
+  requireRole(membership, ["OWNER", "ADMIN"]);
+
+  const target = await GroupMember.findOne({
+    group: group._id,
+    user: targetUserId,
+    status: "REMOVED",
+  });
+  if (!target) {
+    throw new AppError("GROUP_MEMBER_NOT_FOUND", "Membro nao encontrado.", 404);
+  }
+
+  target.status = "ACTIVE";
+  target.role = "MEMBER";
+  target.joinedAt = new Date();
+  await target.save();
+  return serializeMember(await target.populate("user", "name email avatarUrl"));
+}
+
+export async function regenerateInviteCode({ groupId, userId }) {
+  const { group, membership } = await getActiveGroupContext(groupId, userId);
+  requireRole(membership, ["OWNER", "ADMIN"]);
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    group.inviteCode = inviteCode();
+    try {
+      await group.save();
+      return serializeGroup(group, membership, true);
+    } catch (error) {
+      if (
+        error?.code !== 11000 ||
+        !error.keyPattern?.inviteCode ||
+        attempt === 2
+      ) {
+        throw error;
+      }
+    }
+  }
+
+  throw new Error("Nao foi possivel gerar convite");
 }
 
 export async function transferOwner({ groupId, userId, newOwnerId }) {

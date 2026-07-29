@@ -331,6 +331,38 @@ paths:
         "422":
           $ref: "#/components/responses/ValidationError"
 
+  /api/v1/groups/{groupId}/leave:
+    parameters:
+      - $ref: "#/components/parameters/GroupId"
+    post:
+      tags: [Groups]
+      operationId: leaveGroup
+      summary: Sair voluntariamente do grupo
+      description: |
+        Disponível para membros e administradores. O dono deve transferir a
+        propriedade ou excluir o grupo antes de sair. A associação passa a
+        `INACTIVE`, permitindo uma futura entrada pelo código de convite.
+        Participação, prontidão e votos ativos do usuário são removidos.
+      responses:
+        "200":
+          description: Saída concluída.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeftGroupSuccess"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/GroupNotFound"
+        "409":
+          description: "`OWNER_CANNOT_LEAVE`: transfira a propriedade ou exclua o grupo antes de sair."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
   /api/v1/groups/{groupId}:
     parameters:
       - $ref: "#/components/parameters/GroupId"
@@ -415,6 +447,13 @@ paths:
       parameters:
         - $ref: "#/components/parameters/Page"
         - $ref: "#/components/parameters/Limit"
+        - name: status
+          in: query
+          description: "`REMOVED` é visível apenas para `OWNER` e `ADMIN`."
+          schema:
+            type: string
+            enum: [ACTIVE, REMOVED]
+            default: ACTIVE
       responses:
         "200":
           description: Lista paginada de membros.
@@ -508,6 +547,62 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /api/v1/groups/{groupId}/members/{userId}/restore:
+    parameters:
+      - $ref: "#/components/parameters/GroupId"
+      - $ref: "#/components/parameters/UserId"
+    post:
+      tags: [Groups]
+      operationId: restoreGroupMember
+      summary: Restaurar membro removido
+      description: |
+        Exige `OWNER` ou `ADMIN`. Restaura somente associações com status
+        `REMOVED`, sempre como `MEMBER`; não restaura votos, participantes ou
+        prontidão anteriores.
+      responses:
+        "200":
+          description: Membro restaurado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MemberSuccess"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/InsufficientGroupRole"
+        "404":
+          description: "`GROUP_NOT_FOUND` ou `GROUP_MEMBER_NOT_FOUND`."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /api/v1/groups/{groupId}/regenerate-invite:
+    parameters:
+      - $ref: "#/components/parameters/GroupId"
+    post:
+      tags: [Groups]
+      operationId: regenerateGroupInvite
+      summary: Renovar código de convite
+      description: Exige `OWNER` ou `ADMIN` e invalida imediatamente o código anterior.
+      responses:
+        "200":
+          description: Grupo com novo código de convite.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GroupSuccess"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/InsufficientGroupRole"
+        "404":
+          $ref: "#/components/responses/GroupNotFound"
         "422":
           $ref: "#/components/responses/ValidationError"
 
@@ -1892,6 +1987,25 @@ components:
             status:
               type: string
               const: REMOVED
+
+    LeftGroupSuccess:
+      type: object
+      additionalProperties: false
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          type: object
+          additionalProperties: false
+          required: [userId, status]
+          properties:
+            userId:
+              $ref: "#/components/schemas/ObjectId"
+            status:
+              type: string
+              const: INACTIVE
 
     InactiveResourceSuccess:
       type: object

@@ -1,13 +1,13 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-import request from "supertest";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
+import request from "supertest";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import app from "../app.js";
 import env from "../src/config/env.js";
-import User from "../src/models/User.js";
 import Group from "../src/models/Group.js";
 import GroupMember from "../src/models/GroupMember.js";
 import QueueItem from "../src/models/QueueItem.js";
+import User from "../src/models/User.js";
 import Vote from "../src/models/Vote.js";
 import { createGroupSchema } from "../src/modules/groups/groups.validation.js";
 
@@ -170,19 +170,204 @@ integration("groups integration", () => {
     expect(await Vote.countDocuments({ user: member.id })).toBe(0);
   });
 
+  it("recalculates readiness after removing a member from a waiting item", async () => {
+    const owner = await register("Owner User", "owner@example.com");
+    const member = await register("Member User", "member@example.com");
+    const created = await request(app)
+      .post("/api/v1/groups")
+      .set("Authorization", `Bearer ${owner.token}`)
+      .send({ name: "Grupo Privado" });
+
+    await request(app)
+      .post("/api/v1/groups/join")
+      .set("Authorization", `Bearer ${member.token}`)
+      .send({ inviteCode: created.body.data.inviteCode });
+
+    const item = await QueueItem.create({
+      group: created.body.data.id,
+      game: new mongoose.default.Types.ObjectId(),
+      suggestedBy: owner.id,
+      status: "WAITING_PLAYERS",
+      participants: [owner.id, member.id],
+      readyUsers: [owner.id],
+    });
+
+    const removed = await request(app)
+      .delete(`/api/v1/groups/${created.body.data.id}/members/${member.id}`)
+      .set("Authorization", `Bearer ${owner.token}`);
+
+    expect(removed.status).toBe(200);
+    const updated = await QueueItem.findById(item._id);
+    expect(updated.participants.map(String)).toEqual([owner.id]);
+    expect(updated.readyUsers.map(String)).toEqual([owner.id]);
+    expect(updated.status).toBe("READY");
+  });
+
+  it("allows a non-owner to leave and clean their active queue data", async () => {
+    const owner = await register("Owner User", "owner@example.com");
+    const member = await register("Member User", "member@example.com");
+    const created = await request(app)
+      .post("/api/v1/groups")
+      .set("Authorization", `Bearer ${owner.token}`)
+      .send({ name: "Grupo Privado" });
+    await request(app)
+      .post("/api/v1/groups/join")
+      .set("Authorization", `Bearer ${member.token}`)
+      .send({ inviteCode: created.body.data.inviteCode });
+
+    const item = await QueueItem.create({
+      group: created.body.data.id,
+      game: new mongoose.default.Types.ObjectId(),
+      suggestedBy: member.id,
+      status: "VOTING",
+      participants: [member.id],
+      readyUsers: [member.id],
+      voteCount: 1,
+    });
+    await Vote.create({ queueItem: item._id, user: member.id });
+
+    const left = await request(app)
+      .post(`/api/v1/groups/${created.body.data.id}/leave`)
+      .set("Authorization", `Bearer ${member.token}`);
+
+    expect(left.status).toBe(200);
+    expect(left.body.data).toEqual({ userId: member.id, status: "INACTIVE" });
+    expect(
+      await GroupMember.exists({
+        group: created.body.data.id,
+        user: member.id,
+        status: "INACTIVE",
+      }),
+    ).toBeTruthy();
+
+    const updated = await QueueItem.findById(item._id);
+    expect(updated.participants).toHaveLength(0);
+    expect(updated.readyUsers).toHaveLength(0);
+    expect(updated.voteCount).toBe(0);
+    expect(await Vote.countDocuments({ user: member.id })).toBe(0);
+  });
+
+  it("prevents the owner from leaving before transferring ownership", async () => {
+    const owner = await register("Owner User", "owner@example.com");
+    const created = await request(app)
+      .post("/api/v1/groups")
+      .set("Authorization", `Bearer ${owner.token}`)
+      .send({ name: "Grupo Privado" });
+
+    const response = await request(app)
+      .post(`/api/v1/groups/${created.body.data.id}/leave`)
+      .set("Authorization", `Bearer ${owner.token}`);
+
+    expect(response.status).toBe(409);
+    expect(response.body.error.code).toBe("OWNER_CANNOT_LEAVE");
+  });
+
+  it("restores a removed member as MEMBER", async () => {
+    const owner = await register("Owner User", "owner@example.com");
+    const member = await register("Member User", "member@example.com");
+    const created = await request(app)
+      .post("/api/v1/groups")
+      .set("Authorization", `Bearer ${owner.token}`)
+      .send({ name: "Grupo Privado" });
+    await request(app)
+      .post("/api/v1/groups/join")
+      .set("Authorization", `Bearer ${member.token}`)
+      .send({ inviteCode: created.body.data.inviteCode });
+    await request(app)
+      .delete(`/api/v1/groups/${created.body.data.id}/members/${member.id}`)
+      .set("Authorization", `Bearer ${owner.token}`);
+
+    const restored = await request(app)
+      .post(`/api/v1/groups/${created.body.data.id}/members/${member.id}/restore`)
+      .set("Authorization", `Bearer ${owner.token}`);
+
+    expect(restored.status).toBe(200);
+    expect(restored.body.data).toMatchObject({
+      id: member.id,
+      role: "MEMBER",
+      status: "ACTIVE",
+    });
+
+    const detail = await request(app)
+      .get(`/api/v1/groups/${created.body.data.id}`)
+      .set("Authorization", `Bearer ${member.token}`);
+
+    expect(detail.status).toBe(200);
+  });
+
+  it("allows administrators to list removed members for restoration", async () => {
+    const owner = await register("Owner User", "owner@example.com");
+    const member = await register("Member User", "member@example.com");
+    const created = await request(app)
+      .post("/api/v1/groups")
+      .set("Authorization", `Bearer ${owner.token}`)
+      .send({ name: "Grupo Privado" });
+    await request(app)
+      .post("/api/v1/groups/join")
+      .set("Authorization", `Bearer ${member.token}`)
+      .send({ inviteCode: created.body.data.inviteCode });
+    await request(app)
+      .delete(`/api/v1/groups/${created.body.data.id}/members/${member.id}`)
+      .set("Authorization", `Bearer ${owner.token}`);
+
+    const removed = await request(app)
+      .get(`/api/v1/groups/${created.body.data.id}/members?status=REMOVED`)
+      .set("Authorization", `Bearer ${owner.token}`);
+
+    expect(removed.status).toBe(200);
+    expect(removed.body.data.members).toMatchObject([
+      { id: member.id, status: "REMOVED" },
+    ]);
+  });
+
+  it("allows administrators to renew the invite code", async () => {
+    const owner = await register("Owner User", "owner@example.com");
+    const guest = await register("Guest User", "guest@example.com");
+    const created = await request(app)
+      .post("/api/v1/groups")
+      .set("Authorization", `Bearer ${owner.token}`)
+      .send({ name: "Grupo Privado" });
+
+    const renewed = await request(app)
+      .post(`/api/v1/groups/${created.body.data.id}/regenerate-invite`)
+      .set("Authorization", `Bearer ${owner.token}`);
+
+    expect(renewed.status).toBe(200);
+    expect(renewed.body.data.inviteCode).toEqual(expect.any(String));
+    expect(renewed.body.data.inviteCode).not.toBe(created.body.data.inviteCode);
+
+    const oldInvite = await request(app)
+      .post("/api/v1/groups/join")
+      .set("Authorization", `Bearer ${guest.token}`)
+      .send({ inviteCode: created.body.data.inviteCode });
+
+    expect(oldInvite.status).toBe(404);
+
+    const newInvite = await request(app)
+      .post("/api/v1/groups/join")
+      .set("Authorization", `Bearer ${guest.token}`)
+      .send({ inviteCode: renewed.body.data.inviteCode });
+
+    expect(newInvite.status).toBe(201);
+  });
+
   it("soft deletes a group and blocks subsequent access", async () => {
     const owner = await register("Owner User", "owner@example.com");
     const created = await request(app)
       .post("/api/v1/groups")
       .set("Authorization", `Bearer ${owner.token}`)
       .send({ name: "Grupo Temporario" });
+
     const deleted = await request(app)
       .delete(`/api/v1/groups/${created.body.data.id}`)
       .set("Authorization", `Bearer ${owner.token}`);
+
     expect(deleted.status).toBe(200);
+
     const detail = await request(app)
       .get(`/api/v1/groups/${created.body.data.id}`)
       .set("Authorization", `Bearer ${owner.token}`);
+
     expect(detail.status).toBe(404);
     expect((await Group.findById(created.body.data.id)).isActive).toBe(false);
   });

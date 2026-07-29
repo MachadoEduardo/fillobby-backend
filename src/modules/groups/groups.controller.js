@@ -135,6 +135,55 @@ export async function removeMember(req, res, next) {
   }
 }
 
+export async function leave(req, res, next) {
+  try {
+    return res
+      .status(200)
+      .json({
+        success: true,
+        data: await groupsService.leaveGroup({
+          groupId: req.validated.params.groupId,
+          userId: actor(req),
+        }),
+      });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+export async function restoreMember(req, res, next) {
+  try {
+    return res
+      .status(200)
+      .json({
+        success: true,
+        data: await groupsService.restoreMember({
+          groupId: req.validated.params.groupId,
+          userId: actor(req),
+          targetUserId: req.validated.params.userId,
+        }),
+      });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+export async function regenerateInvite(req, res, next) {
+  try {
+    return res
+      .status(200)
+      .json({
+        success: true,
+        data: await groupsService.regenerateInviteCode({
+          groupId: req.validated.params.groupId,
+          userId: actor(req),
+        }),
+      });
+  } catch (error) {
+    return next(error);
+  }
+}
+
 export async function transferOwner(req, res, next) {
   try {
     return res

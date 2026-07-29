@@ -27,6 +27,10 @@ As rotas de grupos estão disponíveis em `/api/v1/groups`:
 - `GET /:groupId/members` para listar membros;
 - `PATCH /:groupId` e `DELETE /:groupId` para administrar o grupo;
 - `PATCH /:groupId/members/:userId/role`, `DELETE /:groupId/members/:userId` e `POST /:groupId/transfer-owner` para administração de membros e propriedade.
+- `POST /:groupId/leave` para um membro ou administrador sair do grupo;
+- `POST /:groupId/members/:userId/restore` para `OWNER` ou `ADMIN` restaurar um membro removido;
+- `POST /:groupId/regenerate-invite` para `OWNER` ou `ADMIN` renovar o código de convite;
+- `GET /:groupId/members?status=REMOVED` para administradores consultarem membros removidos e restaurá-los.
 
 As rotas do catálogo de jogos estão disponíveis em `/api/v1/games`:
 

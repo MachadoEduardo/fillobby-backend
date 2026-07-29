@@ -19,12 +19,15 @@ router.use(authMiddleware);
 router.post('/', validate(createGroupSchema), controller.create);
 router.get('/', validate(listGroupsSchema), controller.list);
 router.post('/join', validate(joinGroupSchema), controller.join);
+router.post('/:groupId/leave', validate(groupParamSchema), controller.leave);
 router.get('/:groupId', validate(groupParamSchema), controller.detail);
 router.patch('/:groupId', validate(updateGroupSchema), controller.update);
 router.delete('/:groupId', validate(groupParamSchema), controller.remove);
 router.get('/:groupId/members', validate(listMembersSchema), controller.members);
 router.patch('/:groupId/members/:userId/role', validate(roleSchema), controller.changeRole);
 router.delete('/:groupId/members/:userId', validate(memberParamSchema), controller.removeMember);
+router.post('/:groupId/members/:userId/restore', validate(memberParamSchema), controller.restoreMember);
 router.post('/:groupId/transfer-owner', validate(transferSchema), controller.transferOwner);
+router.post('/:groupId/regenerate-invite', validate(groupParamSchema), controller.regenerateInvite);
 
 export default router;

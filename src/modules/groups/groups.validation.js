@@ -89,7 +89,10 @@ export const memberParamSchema = z.object({
 export const listMembersSchema = z.object({
   body: z.object({}).default({}),
   params: paramsWithGroup,
-  query: pagination,
+  query: pagination
+    .unwrap()
+    .extend({ status: z.enum(["ACTIVE", "REMOVED"]).default("ACTIVE") })
+    .default({}),
 });
 
 export const roleSchema = z.object({
