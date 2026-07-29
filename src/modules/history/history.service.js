@@ -1,38 +1,7 @@
 import QueueItem from "../../models/QueueItem.js";
 import { getActiveGroupContext } from "../groups/groups.service.js";
 import { QUEUE_STATUS } from "../queue/queue.constants.js";
-
-function id(value) {
-  return value?.toString();
-}
-
-function serializeHistoryItem(item) {
-  const game = item.game;
-  const suggestedBy = item.suggestedBy;
-  return {
-    id: id(item._id),
-    groupId: id(item.group),
-    game: {
-      id: id(game?._id ?? game),
-      title: game?.title,
-      platforms: game?.platforms,
-      maxPlayers: game?.maxPlayers ?? null,
-      coverUrl: game?.coverUrl ?? null,
-    },
-    suggestedBy: {
-      id: id(suggestedBy?._id ?? suggestedBy),
-      name: suggestedBy?.name,
-      avatarUrl: suggestedBy?.avatarUrl ?? null,
-    },
-    status: item.status,
-    voteCount: item.voteCount,
-    participantIds: item.participants.map(id),
-    readyUserIds: item.readyUsers.map(id),
-    completedAt: item.completedAt,
-    createdAt: item.createdAt,
-    updatedAt: item.updatedAt,
-  };
-}
+import { serializeQueueItem } from "../queue/queue.serializer.js";
 
 function startOfUtcDay(value) {
   return new Date(`${value}T00:00:00.000Z`);
@@ -71,13 +40,14 @@ export async function listHistory({
     QueueItem.find(filter)
       .populate("game", "title platforms maxPlayers coverUrl")
       .populate("suggestedBy", "name avatarUrl")
+      .populate("participants", "name avatarUrl")
       .sort({ completedAt: -1, _id: -1 })
       .skip((page - 1) * limit)
       .limit(limit),
   ]);
 
   return {
-    historyItems: items.map(serializeHistoryItem),
+    historyItems: items.map(serializeQueueItem),
     meta: {
       page,
       limit,

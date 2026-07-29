@@ -1614,6 +1614,7 @@ components:
         - status
         - voteCount
         - participantIds
+        - participants
         - readyUserIds
         - completedAt
         - createdAt
@@ -1637,6 +1638,15 @@ components:
           uniqueItems: true
           items:
             $ref: "#/components/schemas/ObjectId"
+        participants:
+          type: array
+          uniqueItems: true
+          description: |
+            Resumos públicos dos participantes, na mesma ordem de
+            `participantIds`. No histórico, continuam presentes mesmo quando o
+            usuário já saiu ou foi removido do grupo.
+          items:
+            $ref: "#/components/schemas/UserSummary"
         readyUserIds:
           type: array
           uniqueItems: true

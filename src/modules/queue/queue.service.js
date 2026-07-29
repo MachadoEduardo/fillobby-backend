@@ -10,6 +10,7 @@ import {
   PUBLIC_STATUS_TRANSITIONS,
   QUEUE_STATUS,
 } from "./queue.constants.js";
+import { serializeQueueItem } from "./queue.serializer.js";
 
 function escapeRegex(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -19,38 +20,11 @@ function id(value) {
   return value?.toString();
 }
 
-function serializeQueueItem(item) {
-  const game = item.game;
-  const suggestedBy = item.suggestedBy;
-  return {
-    id: id(item._id),
-    groupId: id(item.group),
-    game: {
-      id: id(game?._id ?? game),
-      title: game?.title,
-      platforms: game?.platforms,
-      maxPlayers: game?.maxPlayers ?? null,
-      coverUrl: game?.coverUrl ?? null,
-    },
-    suggestedBy: {
-      id: id(suggestedBy?._id ?? suggestedBy),
-      name: suggestedBy?.name,
-      avatarUrl: suggestedBy?.avatarUrl ?? null,
-    },
-    status: item.status,
-    voteCount: item.voteCount,
-    participantIds: item.participants.map(id),
-    readyUserIds: item.readyUsers.map(id),
-    completedAt: item.completedAt,
-    createdAt: item.createdAt,
-    updatedAt: item.updatedAt,
-  };
-}
-
 async function populateItem(item) {
   await item.populate([
     { path: "game", select: "title platforms maxPlayers coverUrl isActive" },
     { path: "suggestedBy", select: "name avatarUrl" },
+    { path: "participants", select: "name avatarUrl" },
   ]);
   return item;
 }
@@ -164,6 +138,7 @@ export async function listQueueItems({
     QueueItem.find(filter)
       .populate("game", "title platforms maxPlayers coverUrl isActive")
       .populate("suggestedBy", "name avatarUrl")
+      .populate("participants", "name avatarUrl")
       .sort(sortOptions[sort])
       .skip((page - 1) * limit)
       .limit(limit),

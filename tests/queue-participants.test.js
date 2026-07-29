@@ -114,6 +114,18 @@ integration("queue participants and readiness integration", () => {
       first.user._id.toString(),
       second.user._id.toString(),
     ]);
+    expect(response.body.data.participants).toEqual([
+      {
+        id: first.user._id.toString(),
+        name: "First Player",
+        avatarUrl: null,
+      },
+      {
+        id: second.user._id.toString(),
+        name: "Second Player",
+        avatarUrl: null,
+      },
+    ]);
     expect(response.body.data.readyUserIds).toEqual([]);
   });
 

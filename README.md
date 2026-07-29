@@ -55,6 +55,10 @@ Itens novos começam em `SUGGESTED`. `COMPLETED` e `CANCELLED` são somente leit
 
 A seleção de participantes encerra a votação, respeita o `maxPlayers` do jogo e mantém `readyUsers` como subconjunto de `participants`. A prontidão é idempotente: o último participante pronto promove o item para `READY`, e qualquer retirada devolve o item para `WAITING_PLAYERS`.
 
+As respostas da fila também incluem `participants` com `id`, `name` e
+`avatarUrl`, além de `participantIds`. O histórico retorna esses resumos mesmo
+depois de uma saída ou remoção do grupo.
+
 As rotas de votos estão disponíveis em `/api/v1/groups/:groupId/queue/:itemId/votes`:
 
 - `POST /` para um membro ativo criar o próprio voto;

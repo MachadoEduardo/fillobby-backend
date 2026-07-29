@@ -138,6 +138,10 @@ integration("history integration", () => {
     });
     context.secondGame.isActive = false;
     await context.secondGame.save();
+    await GroupMember.updateOne(
+      { group: context.group._id, user: context.second.user._id },
+      { $set: { status: "REMOVED" } },
+    );
 
     const otherContext = await createContext();
     await createItem({
@@ -162,6 +166,18 @@ integration("history integration", () => {
       participantIds: [
         context.first.user._id.toString(),
         context.second.user._id.toString(),
+      ],
+      participants: [
+        {
+          id: context.first.user._id.toString(),
+          name: "History Player One",
+          avatarUrl: null,
+        },
+        {
+          id: context.second.user._id.toString(),
+          name: "History Player Two",
+          avatarUrl: null,
+        },
       ],
     });
     expect(response.body.data.historyItems[0].suggestedBy.email).toBeUndefined();
