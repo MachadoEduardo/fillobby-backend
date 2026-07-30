@@ -25,6 +25,18 @@ export async function changePassword(req, res, next) {
   }
 }
 
+export async function updatePreferences(req, res, next) {
+  try {
+    const data = await profileService.updatePreferences({
+      user: req.user,
+      preferredPlatforms: req.body.preferredPlatforms,
+    });
+    return res.status(200).json({ success: true, data });
+  } catch (error) {
+    return next(error);
+  }
+}
+
 export async function uploadAvatar(req, res, next) {
   try {
     const data = await profileService.uploadAvatar({

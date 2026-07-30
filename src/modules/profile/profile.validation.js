@@ -2,6 +2,7 @@ import { z } from "zod";
 import { passwordSchema } from "../auth/auth.validation.js";
 
 const emptyQuery = z.object({}).default({});
+const platforms = ["PC", "PlayStation", "Xbox", "Switch"];
 
 export const updateProfileSchema = z.object({
   body: z
@@ -34,6 +35,24 @@ export const changePasswordSchema = z.object({
         });
       }
     }),
+  params: z.object({}),
+  query: emptyQuery,
+});
+
+export const updatePreferencesSchema = z.object({
+  body: z
+    .object({
+      preferredPlatforms: z
+        .array(z.enum(platforms, { error: "Plataforma invalida." }), {
+          error: "Plataformas preferidas sao obrigatorias.",
+        })
+        .max(4, "Informe no maximo 4 plataformas.")
+        .refine(
+          (values) => new Set(values).size === values.length,
+          "Nao informe plataformas duplicadas.",
+        ),
+    })
+    .strict(),
   params: z.object({}),
   query: emptyQuery,
 });

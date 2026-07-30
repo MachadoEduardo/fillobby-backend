@@ -39,6 +39,12 @@ export async function updateProfile({ user, name }) {
   return serializeUser(user);
 }
 
+export async function updatePreferences({ user, preferredPlatforms }) {
+  user.preferredPlatforms = preferredPlatforms;
+  await user.save();
+  return serializeUser(user);
+}
+
 export async function changePassword({ user, currentPassword, newPassword }) {
   const currentUser = await User.findById(user._id).select("+passwordHash");
   if (!currentUser || !currentUser.isActive)
@@ -52,7 +58,21 @@ export async function changePassword({ user, currentPassword, newPassword }) {
     throw new AppError(
       "INVALID_CURRENT_PASSWORD",
       "Senha atual incorreta.",
-      401,
+      422,
+      [{ field: "body.currentPassword", message: "Senha atual incorreta." }],
+    );
+
+  if (await bcrypt.compare(newPassword, currentUser.passwordHash))
+    throw new AppError(
+      "PASSWORD_REUSE_NOT_ALLOWED",
+      "A nova senha deve ser diferente da senha atual.",
+      422,
+      [
+        {
+          field: "body.newPassword",
+          message: "A nova senha deve ser diferente da senha atual.",
+        },
+      ],
     );
 
   currentUser.passwordHash = await bcrypt.hash(newPassword, env.bcryptRounds);

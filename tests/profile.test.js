@@ -30,6 +30,15 @@ describe("profile contract", () => {
     expect(response.status).toBe(401);
     expect(response.body.error.code).toBe("AUTH_TOKEN_REQUIRED");
   });
+
+  it("requires authentication to update platform preferences", async () => {
+    const response = await request(app)
+      .patch("/api/v1/profile/preferences")
+      .send({ preferredPlatforms: ["PC"] });
+
+    expect(response.status).toBe(401);
+    expect(response.body.error.code).toBe("AUTH_TOKEN_REQUIRED");
+  });
 });
 
 const hasTestDatabase = Boolean(process.env.TEST_MONGO_URI);
@@ -95,6 +104,57 @@ integration("profile integration", () => {
     expect(forbiddenField.body.error.code).toBe("VALIDATION_ERROR");
   });
 
+  it("updates and clears the authenticated user preferred platforms", async () => {
+    const update = await request(app)
+      .patch("/api/v1/profile/preferences")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ preferredPlatforms: ["PC", "Switch"] });
+
+    expect(update.status).toBe(200);
+    expect(update.body.data).toMatchObject({
+      id: user._id.toString(),
+      preferredPlatforms: ["PC", "Switch"],
+    });
+    expect((await User.findById(user._id)).preferredPlatforms).toEqual([
+      "PC",
+      "Switch",
+    ]);
+
+    const clear = await request(app)
+      .patch("/api/v1/profile/preferences")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ preferredPlatforms: [] });
+
+    expect(clear.status).toBe(200);
+    expect(clear.body.data.preferredPlatforms).toEqual([]);
+    expect((await User.findById(user._id)).preferredPlatforms).toEqual([]);
+  });
+
+  it("rejects invalid or duplicated preferred platforms", async () => {
+    const invalid = await request(app)
+      .patch("/api/v1/profile/preferences")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ preferredPlatforms: ["Mobile"] });
+    const duplicated = await request(app)
+      .patch("/api/v1/profile/preferences")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ preferredPlatforms: ["PC", "PC"] });
+
+    expect(invalid.status).toBe(422);
+    expect(invalid.body.error).toMatchObject({
+      code: "VALIDATION_ERROR",
+      details: [
+        {
+          field: "body.preferredPlatforms.0",
+          message: "Plataforma invalida.",
+        },
+      ],
+    });
+    expect(duplicated.status).toBe(422);
+    expect(duplicated.body.error.code).toBe("VALIDATION_ERROR");
+    expect((await User.findById(user._id)).preferredPlatforms).toEqual([]);
+  });
+
   it("changes the password when the current password is correct and the confirmation matches", async () => {
     const response = await request(app)
       .patch("/api/v1/profile/password")
@@ -129,6 +189,60 @@ integration("profile integration", () => {
 
     expect(response.status).toBe(422);
     expect(response.body.error.code).toBe("VALIDATION_ERROR");
+  });
+
+  it("rejects an incorrect current password without changing the stored password", async () => {
+    const response = await request(app)
+      .patch("/api/v1/profile/password")
+      .set("Authorization", `Bearer ${token}`)
+      .send({
+        currentPassword: "SenhaIncorreta123",
+        newPassword: "NovaSenha123",
+        confirmPassword: "NovaSenha123",
+      });
+
+    expect(response.status).toBe(422);
+    expect(response.body.error).toMatchObject({
+      code: "INVALID_CURRENT_PASSWORD",
+      details: [
+        {
+          field: "body.currentPassword",
+          message: "Senha atual incorreta.",
+        },
+      ],
+    });
+
+    const storedUser = await User.findById(user._id).select("+passwordHash");
+    expect(await bcrypt.compare("SenhaAntiga123", storedUser.passwordHash)).toBe(
+      true,
+    );
+  });
+
+  it("rejects reusing the current password", async () => {
+    const response = await request(app)
+      .patch("/api/v1/profile/password")
+      .set("Authorization", `Bearer ${token}`)
+      .send({
+        currentPassword: "SenhaAntiga123",
+        newPassword: "SenhaAntiga123",
+        confirmPassword: "SenhaAntiga123",
+      });
+
+    expect(response.status).toBe(422);
+    expect(response.body.error).toMatchObject({
+      code: "PASSWORD_REUSE_NOT_ALLOWED",
+      details: [
+        {
+          field: "body.newPassword",
+          message: "A nova senha deve ser diferente da senha atual.",
+        },
+      ],
+    });
+
+    const storedUser = await User.findById(user._id).select("+passwordHash");
+    expect(await bcrypt.compare("SenhaAntiga123", storedUser.passwordHash)).toBe(
+      true,
+    );
   });
 
   it("uploads, serves and replaces the avatar without duplicating it", async () => {

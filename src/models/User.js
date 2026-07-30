@@ -19,6 +19,10 @@ const userSchema = new mongoose.Schema(
     },
     passwordHash: { type: String, required: true, select: false },
     avatarUrl: { type: String, trim: true, default: null },
+    preferredPlatforms: {
+      type: [{ type: String, enum: ["PC", "PlayStation", "Xbox", "Switch"] }],
+      default: [],
+    },
     isActive: { type: Boolean, default: true },
   },
   { timestamps: true },

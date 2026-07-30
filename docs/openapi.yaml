@@ -150,6 +150,56 @@ paths:
         "422":
           $ref: "#/components/responses/ValidationError"
 
+  /api/v1/profile/password:
+    patch:
+      tags: [Profile]
+      operationId: changeOwnPassword
+      summary: Alterar a propria senha
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangePasswordInput"
+      responses:
+        "200":
+          description: Senha atualizada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserSuccess"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          description: Dados invalidos, senha atual incorreta ou reutilizacao da senha atual.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/profile/preferences:
+    patch:
+      tags: [Profile]
+      operationId: updateOwnPreferences
+      summary: Atualizar plataformas preferidas
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePreferencesInput"
+      responses:
+        "200":
+          description: Preferencias atualizadas.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserSuccess"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
   /api/v1/profile/avatar:
     put:
       tags: [Profile]
@@ -1448,7 +1498,7 @@ components:
     PublicUser:
       type: object
       additionalProperties: false
-      required: [id, name, email, avatarUrl]
+      required: [id, name, email, avatarUrl, preferredPlatforms]
       properties:
         id:
           $ref: "#/components/schemas/ObjectId"
@@ -1464,6 +1514,12 @@ components:
         avatarUrl:
           type: [string, "null"]
           format: uri
+        preferredPlatforms:
+          type: array
+          maxItems: 4
+          uniqueItems: true
+          items:
+            $ref: "#/components/schemas/Platform"
 
     UserSummary:
       type: object
@@ -1731,6 +1787,38 @@ components:
           type: string
           minLength: 2
           maxLength: 80
+
+    ChangePasswordInput:
+      type: object
+      additionalProperties: false
+      required: [currentPassword, newPassword, confirmPassword]
+      properties:
+        currentPassword:
+          type: string
+          format: password
+          minLength: 1
+        newPassword:
+          type: string
+          format: password
+          minLength: 8
+          maxLength: 72
+          description: Deve conter letra minuscula, letra maiuscula e numero.
+        confirmPassword:
+          type: string
+          format: password
+          minLength: 1
+
+    UpdatePreferencesInput:
+      type: object
+      additionalProperties: false
+      required: [preferredPlatforms]
+      properties:
+        preferredPlatforms:
+          type: array
+          maxItems: 4
+          uniqueItems: true
+          items:
+            $ref: "#/components/schemas/Platform"
 
     CreateGroupInput:
       type: object

@@ -10,6 +10,7 @@ export function serializeUser(user) {
     name: user.name,
     email: user.email,
     avatarUrl: user.avatarUrl ?? null,
+    preferredPlatforms: user.preferredPlatforms ?? [],
   };
 }
 

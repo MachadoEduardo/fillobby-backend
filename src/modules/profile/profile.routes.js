@@ -2,7 +2,11 @@ import { Router, raw } from 'express';
 import authMiddleware from '../../middlewares/auth.middleware.js';
 import { validate } from '../../middlewares/validation.middleware.js';
 import * as controller from './profile.controller.js';
-import { changePasswordSchema, updateProfileSchema } from './profile.validation.js';
+import {
+  changePasswordSchema,
+  updatePreferencesSchema,
+  updateProfileSchema,
+} from './profile.validation.js';
 import AppError from '../../shared/errors/AppError.js';
 
 const router = Router();
@@ -27,6 +31,11 @@ router.get('/avatars/:userId', controller.avatar);
 router.use(authMiddleware);
 router.patch('/', validate(updateProfileSchema), controller.update);
 router.patch('/password', validate(changePasswordSchema), controller.changePassword);
+router.patch(
+  '/preferences',
+  validate(updatePreferencesSchema),
+  controller.updatePreferences,
+);
 router.put('/avatar', parseAvatar, controller.uploadAvatar);
 router.delete('/avatar', controller.removeAvatar);
 

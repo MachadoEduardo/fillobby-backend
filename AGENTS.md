@@ -185,7 +185,20 @@ No mesmo grupo, um jogo não pode possuir dois itens ativos simultaneamente. `CO
 
 ## Testes e verificação
 
-Toda alteração deve ser verificada na proporção do risco. Ao adicionar uma regra de negócio, inclua teste correspondente assim que a infraestrutura de testes existir.
+Adote TDD como fluxo padrão para novos módulos, funcionalidades e regras de negócio. Antes da implementação, escreva pelo menos um teste que descreva o comportamento esperado e falhe pelo motivo correto. Em seguida, implemente o mínimo necessário para fazê-lo passar e refatore mantendo a suíte verde (`red -> green -> refactor`). Correções de bugs devem começar, sempre que viável, por um teste de regressão que reproduza o problema.
+
+Os testes devem guiar o comportamento público e as invariantes do domínio, não a estrutura interna do código. Toda alteração deve ser verificada na proporção do risco e todos os testes automatizados devem poder ser executados por `npm test`.
+
+Ao aplicar TDD:
+
+- comece pelos casos de sucesso, entradas inválidas, ausência de autenticação ou permissão e conflitos relevantes;
+- prefira testes de integração com Vitest, Supertest e banco MongoDB isolado para rotas, middlewares, persistência, índices e operações entre coleções;
+- use testes unitários para services quando houver regras puras ou complexas que possam ser verificadas sem infraestrutura externa;
+- crie helpers e factories pequenos somente quando houver repetição real;
+- não introduza repositories, mocks extensos ou abstrações apenas para facilitar testes;
+- não teste detalhes triviais de implementação nem duplique exaustivamente validações já cobertas por Zod ou Mongoose sem comportamento adicional;
+- não persiga cobertura de 100% como objetivo isolado; priorize regras críticas, cenários de falha e regressões;
+- mantenha os testes determinísticos, independentes e seguros para execução repetida, sem acessar ou limpar bancos que não sejam explicitamente de teste.
 
 Prioridades de teste:
 

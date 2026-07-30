@@ -18,6 +18,7 @@ describe("auth contract", () => {
       name: "Ana",
       email: "ana@email.com",
       avatarUrl: null,
+      preferredPlatforms: [],
     });
     expect(serializeUser(user)).not.toHaveProperty("passwordHash");
   });
