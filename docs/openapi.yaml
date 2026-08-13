@@ -1746,7 +1746,7 @@ components:
     RegisterInput:
       type: object
       additionalProperties: false
-      required: [name, email, password]
+      required: [name, email, password, confirmPassword]
       properties:
         name:
           type: string
@@ -1764,6 +1764,11 @@ components:
           description: |
             Deve conter letra minúscula, letra maiúscula e número. O limite
             efetivo é de 72 bytes UTF-8.
+        confirmPassword:
+          type: string
+          format: password
+          minLength: 1
+          description: Deve ser idêntica ao campo `password`.
 
     LoginInput:
       type: object

@@ -37,6 +37,28 @@ describe("auth contract", () => {
     expect(response.status).toBe(422);
     expect(response.body.error.code).toBe("VALIDATION_ERROR");
   });
+
+  it("rejects registration when the password confirmation does not match", async () => {
+    const response = await request(app)
+      .post("/api/v1/auth/register")
+      .send({
+        name: "Ana Silva",
+        email: "ana@email.com",
+        password: "SenhaForte123",
+        confirmPassword: "SenhaDiferente123",
+      });
+
+    expect(response.status).toBe(422);
+    expect(response.body.error).toMatchObject({
+      code: "VALIDATION_ERROR",
+      details: [
+        {
+          field: "body.confirmPassword",
+          message: "A confirmacao da senha nao confere.",
+        },
+      ],
+    });
+  });
 });
 
 const hasTestDatabase = Boolean(process.env.TEST_MONGO_URI);
@@ -65,6 +87,7 @@ integration("auth integration", () => {
         name: "Ana Silva",
         email: "ANA@EMAIL.COM",
         password: "SenhaForte123",
+        confirmPassword: "SenhaForte123",
       });
     expect(registration.status).toBe(201);
     expect(registration.body.data.user).toBeUndefined();
@@ -89,6 +112,7 @@ integration("auth integration", () => {
       name: "Ana Silva",
       email: "ana@email.com",
       password: "SenhaForte123",
+      confirmPassword: "SenhaForte123",
     };
     await request(app).post("/api/v1/auth/register").send(payload);
     const duplicate = await request(app)

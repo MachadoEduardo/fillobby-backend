@@ -27,8 +27,20 @@ export const registerSchema = base.extend({
         .max(80, "Nome deve ser menor ou igual a 80 caracteres"),
       email: z.string().trim().toLowerCase().email("Email invalido"),
       password: passwordSchema,
+      confirmPassword: z
+        .string()
+        .min(1, "Confirmacao da senha e obrigatoria."),
     })
-    .strict(),
+    .strict()
+    .superRefine((data, ctx) => {
+      if (data.password !== data.confirmPassword) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["confirmPassword"],
+          message: "A confirmacao da senha nao confere.",
+        });
+      }
+    }),
 });
 
 export const loginSchema = base.extend({
