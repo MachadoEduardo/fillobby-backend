@@ -1,396 +1,282 @@
-# Roadmap de evolução do Fillobby
+# Roadmap contínuo do Fillobby
 
-## Objetivo do produto
+## Direção do produto
 
-O Fillobby deve ser o ponto de encontro anterior à partida: o lugar em que um
-grupo decide **o que jogar, quando jogar, com quem jogar e se todos estão
-prontos**. O produto já cobre bem a primeira versão desse ciclo com grupos,
-catálogo manual, sugestões, votos, participantes, prontidão e histórico.
+O Fillobby deve ser o ponto de encontro anterior à partida: o lugar em que um grupo decide **o que jogar, quando jogar, com quem jogar e se todos estão prontos**. O produto atual já cobre grupos, catálogo, sugestões, votos, participantes, prontidão e histórico. A evolução deve primeiro consolidar essa base, depois completar a organização da partida e somente então adicionar integrações e recursos de retenção.
 
-As próximas entregas abaixo foram ordenadas para primeiro remover atritos e
-riscos do produto atual, depois completar o ciclo de organização de uma sessão
-e, por último, adicionar integrações, descoberta e recursos de escala.
+Este documento é um backlog priorizado, não um compromisso de implementar tudo. Antes de iniciar uma etapa, valide a hipótese com usuários e reordene os itens conforme uso, suporte e métricas.
 
-### Como usar este arquivo
+### Critérios de prioridade
 
-- A numeração é a ordem recomendada de execução; itens posteriores podem
-  depender dos anteriores.
-- **P0** é fundamento ou correção de atrito importante, **P1** é alto impacto no
-  uso recorrente e **P2** amplia retenção ou conveniência. A etiqueta indica o
-  valor dentro do seu contexto; a ordem numérica continua sendo o guia de
-  execução.
-- Cada item deve incluir frontend, backend, contrato OpenAPI, testes e estados
-  de carregamento/erro/vazio quando essas camadas forem afetadas.
-- Segurança, privacidade, acessibilidade, responsividade e observabilidade são
-  critérios de aceite de todas as entregas, mesmo quando também aparecem em
-  itens próprios de aprofundamento.
-- Antes de iniciar uma fase grande, validar a hipótese com usuários reais e
-  medir adoção. Não é necessário implementar todos os itens de uma fase em um
-  único lançamento.
+- **P0:** corrige risco, inconsistência ou bloqueio da evolução.
+- **P1:** entrega valor direto e recorrente ao usuário.
+- **P2:** aumenta conveniência ou retenção depois que o fluxo principal estiver validado.
+- Toda entrega deve considerar backend, frontend, OpenAPI, testes, segurança, acessibilidade e estados de loading, erro e vazio.
+- Novas regras devem seguir TDD, com foco em testes E2E dos fluxos importantes, não em cobertura artificial.
 
-## Fase 1 — Fechar lacunas essenciais de conta e confiança
+## Diagnóstico atual
 
-### 1. Mostrar e ocultar senha nos formulários — P0
+Pontos fortes:
 
-Adicionar um controle acessível nos campos de senha de login, cadastro e troca
-de senha. É uma melhoria pequena, reduz erros de digitação e ajuda bastante em
-dispositivos móveis.
+- autorização contextual por grupo e papéis `OWNER`, `ADMIN` e `MEMBER`;
+- máquina de estados explícita para a fila;
+- validação com Zod, respostas e erros consistentes;
+- índices e transações protegendo votos, membros e itens ativos;
+- frontend organizado por features, responsivo e com feedback contextual.
 
-### 2. Confirmar senha no cadastro — P0
+Limitações que devem ser tratadas antes de uma expansão grande:
 
-Adicionar `confirmPassword` ao cadastro, validar a igualdade no cliente e no
-servidor e manter a regra de força da senha visível durante o preenchimento.
-Evita que uma conta seja criada com uma senha digitada incorretamente.
+- `QueueItem` representa sugestão, votação, formação de time, partida e histórico ao mesmo tempo;
+- services de grupos e fila concentram regras, persistência e coordenação entre módulos;
+- testes de integração do backend são ignorados sem `TEST_MONGO_URI` e não existe CI do backend;
+- o frontend testa principalmente o cliente HTTP, sem E2E dos fluxos reais;
+- JWT fica no `localStorage`, sem revogação, recuperação de senha ou ciclo de sessões;
+- paginação de grupos ocorre em memória e a interface usa limites fixos de 50/100 itens;
+- polling frequente substitui uma estratégia de sincronização orientada a eventos;
+- preferências de plataforma são cadastradas, mas ainda não influenciam decisões;
+- não há logs estruturados, auditoria administrativa ou readiness do banco.
 
-### 3. Recuperação de senha por e-mail — P0
+## Etapa 0 — Fundação confiável
 
-Criar os fluxos “Esqueci minha senha” e “Definir nova senha”, com token de uso
-único, curta duração, hash do token no banco, rate limit e invalidação após o
-uso. O envio deve acontecer por um provedor de e-mail e nunca revelar se um
-endereço está cadastrado.
+### 1. Padronizar toolchain e CI — P0
 
-### 4. Verificação e alteração segura de e-mail — P0
+Escolher uma versão de Node e um único gerenciador de pacotes para frontend e backend. Adicionar CI ao backend com lint, testes, MongoDB preparado para transações e validação do OpenAPI. Manter lint, typecheck, testes e build no frontend.
 
-Verificar o e-mail no cadastro e permitir sua alteração mediante senha atual e
-confirmação no novo endereço. Contas não verificadas podem receber um período
-de tolerância, mas ações sensíveis e convites devem exigir verificação.
+- **Valor:** elimina diferenças entre ambiente local e CI e impede entregas com testes críticos ignorados.
+- **Complexidade:** média.
+- **Dependências:** MongoDB de teste ou Testcontainers; definição da versão oficial do Node.
+- **Impacto:** infraestrutura, ambos os repositórios e documentação.
+- **Tipo:** técnico.
 
-### 5. Sessões seguras e encerramento remoto — P0
+### 2. Testes E2E dos fluxos centrais — P0
 
-Substituir o JWT único no `localStorage` por sessão com access token curto e
-refresh token rotativo em cookie `HttpOnly`, com proteção contra reutilização.
-Adicionar “Dispositivos conectados”, “Sair deste dispositivo” e “Sair de todos”.
-Essa base também facilita login social e conexão com plataformas no futuro.
+Adicionar Playwright para cadastro/login, criação ou entrada em grupo, sugestão, votação, seleção de participantes, prontidão e conclusão. O backend deve falhar na CI quando o banco de integração não estiver configurado, em vez de ignorar a maior parte da suíte.
 
-### 6. Controles da conta e privacidade — P0
+- **Valor:** detecta regressões que testes isolados do cliente HTTP não encontram.
+- **Complexidade:** média.
+- **Dependências:** ambiente de teste determinístico e dados descartáveis.
+- **Impacto:** frontend, backend e CI.
+- **Tipo:** qualidade.
 
-Permitir desativar/excluir a própria conta, exportar os dados pessoais e
-explicar o destino de votos, histórico e grupos pertencentes ao usuário. A
-exclusão deve exigir reautenticação e tratar transferência de propriedade antes
-de remover ou anonimizar dados.
+### 3. OpenAPI como fonte única — P0
 
-### 7. Proteção operacional e qualidade contínua — P0
+Gerar tipos e cliente TypeScript a partir do contrato, validar o YAML na CI e adicionar testes de contrato para respostas importantes.
 
-Criar CI para executar testes, typecheck, lint, build e validação do OpenAPI em
-cada alteração. Acrescentar logs estruturados com identificador de requisição,
-monitoramento de erros, telemetria mínima do funil do produto, health/readiness
-checks, limites de payload e rate limits por operação sensível. Isso reduz
-regressões e permite validar as fases seguintes com dados.
+- **Valor:** evita divergência silenciosa entre API, tipos manuais e interface.
+- **Complexidade:** baixa/média.
+- **Dependências:** escolha do gerador e política de versionamento.
+- **Impacto:** documentação, API e frontend.
+- **Tipo:** técnico e arquitetural.
 
-## Fase 2 — Tornar entrada e administração de grupos mais simples
+### 4. Paginação e consultas previsíveis — P0
 
-### 8. Convite por link com entrada direta — P0
+Aplicar `skip/limit` ou cursor diretamente no banco para grupos e remover limites invisíveis de fila, membros, votos e seletores. Adicionar paginação ou infinite scroll na interface e revisar índices com base nas consultas reais.
 
-Além de copiar o código, gerar uma URL como `/invite/:code`, com prévia segura
-do nome e da imagem do grupo e redirecionamento de volta após login/cadastro.
-Adicionar compartilhamento nativo no celular e manter a opção de revogar o
-convite. É uma das melhorias com maior potencial de aquisição orgânica.
+- **Valor:** impede dados inacessíveis e crescimento de memória/latência.
+- **Complexidade:** média.
+- **Dependências:** padrão único de paginação.
+- **Impacto:** services, índices, API e React Query.
+- **Tipo:** técnico e UX.
 
-### 9. Convites administráveis — P1
+### 5. Observabilidade e saúde operacional — P0
 
-Evoluir o código único para convites identificáveis, com criador, validade,
-limite de usos e opção de revogação. Exibir os convites ativos e o número de
-entradas geradas por cada um sem expor informações privadas para não membros.
+Adicionar logs JSON com request ID, monitoramento de erros, endpoint de liveness e readiness com verificação do MongoDB. Configurar corretamente proxy e rate limits para o ambiente de produção e corrigir dependências vulneráveis apontadas pelo audit.
 
-### 10. Onboarding orientado à primeira partida — P1
+- **Valor:** reduz tempo de diagnóstico e torna falhas de produção observáveis.
+- **Complexidade:** média.
+- **Dependências:** plataforma de logs/erros e política de retenção.
+- **Impacto:** middleware, deploy e suporte.
+- **Tipo:** técnico e segurança.
 
-Após o cadastro, conduzir o usuário por um checklist curto: criar ou entrar em
-um grupo, escolher plataformas, sugerir um jogo e convidar amigos. Mostrar
-progresso apenas até o primeiro ciclo útil para não transformar a interface em
-um tutorial permanente.
+### 6. Evolução incremental para DDD — P0
 
-### 11. Imagem, banner e identidade do grupo — P1
+Definir os contextos Identidade, Grupos, Catálogo, Decisão/Fila e Sessões. Extrair políticas de autorização, transições e participantes para regras de domínio independentes do Mongoose. Introduzir repositories apenas para consultas ou transações complexas, sem reescrita total.
 
-Permitir ao `OWNER`/`ADMIN` anexar avatar e banner, escolher cor de destaque e
-remover ou recortar as imagens. Usar armazenamento de objetos com URLs
-assinadas/CDN, validação real do tipo do arquivo, limites de dimensão/tamanho e
-miniaturas; não armazenar novos binários grandes no MongoDB.
+- **Valor:** evita que novos módulos ampliem o acoplamento dos services atuais.
+- **Complexidade:** média/alta.
+- **Dependências:** ADR com limites dos contextos e eventos relevantes.
+- **Impacto:** services, models e testes.
+- **Tipo:** arquitetural.
 
-### 12. Preferências e regras do grupo — P1
+## Etapa 1 — Melhorar o produto atual
 
-Adicionar fuso horário, plataformas usadas, idioma, limite padrão de
-participantes e regras de entrada (livre por convite ou aprovação de admin).
-Essas configurações serão a base de agenda, catálogo e notificações.
+### 7. Convite por link e onboarding curto — P1
 
-### 13. Melhorias na lista de grupos — P1
+Criar `/invite/:code`, preservar o convite durante login/cadastro, permitir compartilhamento nativo e orientar o novo usuário até entrar em um grupo e sugerir o primeiro jogo. Depois, adicionar validade, limite de usos e revogação por convite.
 
-Incluir busca, ordenação por atividade recente, contagem de membros, indicador
-de ações pendentes e opção de fixar/arquivar grupos. O card deve mostrar algo
-útil para retornar, como “votação aberta” ou “2 participantes aguardando”.
+- **Valor:** reduz o maior atrito de aquisição e ativação.
+- **Complexidade:** baixa/média.
+- **Dependências:** rota pública segura e redirecionamento pós-login.
+- **Impacto:** autenticação, grupos e frontend.
+- **Tipo:** funcional e UX.
 
-### 14. Solicitação e aprovação de entrada — P2
+### 8. Fechamento real de votação — P1
 
-Para grupos que optarem por aprovação, criar uma caixa de solicitações com
-aceitar, recusar e bloquear novo pedido. Mantém links fáceis de compartilhar
-sem abrir mão do controle do grupo.
+Criar uma rodada de votação com prazo opcional, encerramento explícito, resultado, empate e responsável pela decisão. Começar com voto de aprovação e desempate pelo admin; votação ranqueada só deve ser considerada após demanda real.
 
-## Fase 3 — Substituir o catálogo manual por dados confiáveis
+- **Valor:** torna os votos uma decisão verificável, não apenas um indicador informal.
+- **Complexidade:** média.
+- **Dependências:** definir a relação entre rodada, itens e futura sessão.
+- **Impacto:** fila, votos, histórico e interface.
+- **Tipo:** funcional e regra de negócio.
 
-### 15. Definir a fonte externa e o modelo canônico de jogos — P0
+### 9. Participação mais autônoma — P1
 
-Fazer uma prova de conceito com provedores como IGDB ou RAWG e decidir com base
-em licença, qualidade das capas, plataformas, rate limit, estabilidade e custo.
-O modelo local deve guardar o ID externo, origem, slug, gêneros, imagens,
-lançamento, modos de jogo, suporte online/local, cross-play quando disponível e
-data da última sincronização.
+Permitir autoinscrição quando habilitada, saída voluntária antes da partida, capacidade, mínimo de jogadores e lista de espera. Toda alteração deve recalcular prontidão atomicamente.
 
-### 16. Busca e importação do catálogo externo — P1
+- **Valor:** reduz trabalho administrativo e representa melhor a disponibilidade real.
+- **Complexidade:** média.
+- **Dependências:** política configurável do grupo ou da sessão.
+- **Impacto:** participantes, prontidão e notificações.
+- **Tipo:** funcional.
 
-Fazer a busca pelo backend, com cache, deduplicação e proteção das credenciais.
-Ao sugerir um jogo, importar ou atualizar o registro local de forma idempotente.
-A experiência principal deixa de exigir título, capa, descrição e quantidade de
-jogadores preenchidos manualmente.
+### 10. Navegação e sincronização mais claras — P1
 
-### 17. Migração e curadoria do catálogo existente — P1
+Persistir aba, filtros e paginação na URL, mostrar quando os dados foram atualizados e reduzir polling conforme aba e visibilidade. Manter atualização manual e dados anteriores quando houver falha.
 
-Vincular os jogos manuais aos IDs externos, revisar possíveis duplicatas e
-preservar todas as referências da fila e do histórico. Depois da migração,
-restringir criação/edição manual a administradores do sistema ou a um fluxo de
-“jogo não encontrado”, com aprovação e trilha de origem.
+- **Valor:** melhora navegação, compartilhamento e confiança em dados colaborativos.
+- **Complexidade:** baixa/média.
+- **Dependências:** convenção de parâmetros de busca no router.
+- **Impacto:** rotas, componentes e React Query.
+- **Tipo:** UX e performance.
 
-### 18. Capas por anexo e processamento de mídia — P1
+### 11. Contas e sessões seguras — P0
 
-Como fallback para jogos sem imagem, permitir anexo em vez de apenas URL.
-Reaproveitar o pipeline de mídia da identidade dos grupos para validar,
-redimensionar e gerar formatos otimizados. URLs remotas devem ser importadas e
-servidas de forma controlada para evitar conteúdo quebrado ou malicioso.
+Implementar recuperação de senha, verificação de e-mail e sessões revogáveis com access token curto e refresh token rotativo em cookie `HttpOnly`. Adicionar logout de todos os dispositivos, desativação e exportação da conta.
 
-### 19. Catálogo mais útil para o grupo — P1
+- **Valor:** evita perda definitiva de acesso e reduz impacto de roubo de token.
+- **Complexidade:** alta.
+- **Dependências:** provedor de e-mail, modelo de sessões e política de retenção.
+- **Impacto:** autenticação, perfil, frontend e banco.
+- **Tipo:** segurança e funcional.
 
-Adicionar filtros por gênero, modo online/local, número de jogadores,
-plataforma e cross-play, além de páginas de detalhe e links oficiais/lojas. Na
-hora de sugerir, destacar jogos compatíveis com as plataformas preferidas dos
-membros do grupo.
+## Etapa 2 — Completar a organização da partida
 
-### 20. Biblioteca pessoal e disponibilidade por plataforma — P2
+### 12. Criar `GameSession` — P1
 
-Permitir marcar “Tenho”, “Quero jogar” e a plataforma em que cada usuário possui
-o jogo. A fila pode então mostrar quantas pessoas já têm acesso ao título e
-evitar escolher um jogo indisponível para parte do grupo.
+Manter `QueueItem` como sugestão ou backlog e criar uma entidade para a partida escolhida, com jogo, origem da decisão, criador, horário, fuso, capacidade, participantes, início/fim real e estados `DRAFT`, `SCHEDULED`, `READY`, `PLAYING`, `COMPLETED` e `CANCELLED`.
 
-## Fase 4 — Completar a organização da sessão de jogo
+- **Valor:** remove a sobrecarga conceitual da fila e desbloqueia agenda e histórico confiável.
+- **Complexidade:** alta.
+- **Dependências:** migração dos itens atuais sem perda de histórico.
+- **Impacto:** fila, histórico, API, banco e frontend.
+- **Tipo:** funcional e arquitetural.
 
-### 21. Criar a entidade `GameSession` — P0
+### 13. Disponibilidade, agenda e RSVP — P1
 
-Separar “item candidato na fila” de “sessão que realmente vai acontecer”. Uma
-sessão deve pertencer ao grupo e registrar jogo escolhido, criador, início,
-duração estimada, participantes, fuso horário e estados `DRAFT`, `SCHEDULED`,
-`READY`, `PLAYING`, `COMPLETED` e `CANCELLED`. Migrar o histórico atual sem
-perder dados.
+Permitir propor horários e responder “posso”, “talvez” ou “não posso”, sempre exibindo no fuso local. Após escolher um horário, publicar a sessão e coletar confirmação de presença.
 
-### 22. Enquete de data e disponibilidade — P1
+- **Valor:** resolve a principal lacuna atual: decidir quando jogar sem voltar ao chat externo.
+- **Complexidade:** alta.
+- **Dependências:** `GameSession`, fuso horário e preferências do grupo.
+- **Impacto:** novo módulo, perfil, grupos e frontend.
+- **Tipo:** funcional.
 
-Permitir que membros proponham horários e respondam “posso”, “talvez” ou “não
-posso”. Exibir todos os horários no fuso local de cada pessoa e destacar a opção
-com maior interseção de participantes. Esse recurso resolve a maior lacuna do
-ciclo atual: decidir quando jogar.
+### 14. Calendário e recorrência gradual — P1/P2
 
-### 23. Agendamento e RSVP — P1
+Exportar `.ics` e oferecer links para calendários usando identificador estável. Só depois validar sessões recorrentes, permitindo editar uma ocorrência sem alterar toda a série.
 
-Após escolher data e jogo, publicar a sessão e coletar confirmação de presença.
-Administradores podem definir capacidade; excedentes entram em lista de espera
-e são promovidos automaticamente quando surgir uma vaga.
+- **Valor:** conecta a decisão do grupo à rotina real dos participantes.
+- **Complexidade:** média para exportação; alta para recorrência.
+- **Dependências:** sessões agendadas estáveis.
+- **Impacto:** sessões e integrações.
+- **Tipo:** funcional e integração.
 
-### 24. Ligar votação, fila e sessão — P1
+### 15. Histórico e auditoria enriquecidos — P1
 
-Permitir abrir uma votação para uma sessão específica e transformar o vencedor
-em jogo agendado, preservando votos e participantes. A fila geral continua útil
-como backlog de ideias, mas cada decisão passa a ter contexto e prazo claros.
+Registrar `startedAt`, `endedAt`, duração, motivo de cancelamento, participantes finais e opção “jogar novamente”. Criar trilha para entrada/remoção de membro, mudança de papel, convite renovado, votação encerrada e sessão cancelada.
 
-### 25. Ciclo da sessão e registro da partida — P1
+- **Valor:** aumenta confiança administrativa e transforma o histórico em memória útil do grupo.
+- **Complexidade:** média.
+- **Dependências:** eventos de domínio e política de visibilidade.
+- **Impacto:** grupos, sessões, histórico e suporte.
+- **Tipo:** funcional, segurança e auditoria.
 
-Adaptar prontidão, início e conclusão para a sessão agendada. Registrar início e
-fim reais, participantes finais, quem faltou e motivo de cancelamento, sem
-permitir que a edição posterior corrompa o histórico.
+## Etapa 3 — Catálogo, mídia e personalização
 
-### 26. Calendário e exportação — P1
+### 16. Corrigir governança do catálogo — P1
 
-Criar visualização de próximas sessões e exportação `.ics`, além de links para
-Google Calendar, Outlook e Apple Calendar. Convites e atualizações devem manter
-um identificador estável para não duplicar eventos.
+Rever autoria e edição de jogos globais, reativação de registros inativos e títulos com edições diferentes. Um item reativado não deve preservar dados obsoletos nem ficar sem responsável capaz de corrigi-lo.
 
-### 27. Sessões recorrentes — P2
+- **Valor:** evita dados globais inconsistentes e conflitos entre usuários.
+- **Complexidade:** média.
+- **Dependências:** política de curadoria e modelo canônico.
+- **Impacto:** catálogo, fila e histórico.
+- **Tipo:** regra de negócio e arquitetural.
 
-Permitir padrões como “toda sexta às 21h”, criando ocorrências editáveis
-individualmente. É especialmente útil para grupos fixos, mas deve vir depois do
-agendamento simples estar validado.
+### 17. Catálogo externo e compatibilidade — P1
 
-## Fase 5 — Melhorar decisão, fila e pós-partida
+Fazer prova de conceito com IGDB ou RAWG considerando licença, custo, qualidade e rate limit. Importar pelo backend com cache e deduplicação. Usar plataformas preferidas e, futuramente, biblioteca pessoal para destacar jogos compatíveis com o grupo.
 
-### 28. Prazo e regras configuráveis de votação — P1
+- **Valor:** remove cadastro manual e torna as preferências já existentes realmente úteis.
+- **Complexidade:** alta.
+- **Dependências:** provedor escolhido e migração dos jogos atuais.
+- **Impacto:** catálogo, perfil, busca e fila.
+- **Tipo:** funcional e integração.
 
-Adicionar horário de encerramento, quantidade máxima de votos por pessoa e
-opção de resultado visível ou oculto até o fim. Começar com voto de aprovação,
-que já existe, e só depois avaliar votação ranqueada para evitar complexidade
-prematura.
+### 18. Privacidade e armazenamento de mídia — P1
 
-### 29. Encerramento automático e desempate explícito — P1
+Não expor e-mail de membros para todos por padrão. Validar dimensões e conteúdo de imagens, adicionar cache HTTP e mover novos avatares, capas e imagens de grupo para object storage com miniaturas.
 
-Ao vencer o prazo, fechar a votação por job idempotente e aplicar uma regra
-definida pelo grupo: decisão do admin, sorteio transparente entre empatados ou
-nova rodada. Registrar a regra e o resultado para que ninguém precise resolver
-o empate fora do Fillobby.
+- **Valor:** melhora privacidade, desempenho e custo de servir mídia.
+- **Complexidade:** média.
+- **Dependências:** política de privacidade e provedor de armazenamento.
+- **Impacto:** perfil, grupos, catálogo e frontend.
+- **Tipo:** segurança e técnico.
 
-### 30. Priorização e organização da fila — P1
+## Etapa 4 — Retenção e integrações
 
-Permitir ao admin fixar, reordenar, adiar ou reabrir sugestões, mantendo um log
-das alterações. Adicionar visualizações por etapa e paginação/infinite scroll;
-hoje a tela busca um lote fixo de itens e depende apenas da ordenação por votos.
+### 19. Notificações úteis — P1
 
-### 31. Participantes mais flexíveis — P1
+Criar central interna com preferências e deep links. Notificar apenas eventos acionáveis: votação terminando, horário escolhido, RSVP pendente, mudança de sessão e prontidão. E-mail e Web Push devem ser opt-in e processados por jobs idempotentes.
 
-Incluir autoinscrição quando habilitada, lista de espera, número mínimo de
-jogadores, saída voluntária e substituição antes do início. Mudanças de
-participantes precisam recalcular prontidão e respeitar a capacidade do jogo ou
-da sessão.
+- **Valor:** traz o usuário de volta no momento em que sua ação é necessária.
+- **Complexidade:** alta.
+- **Dependências:** sessões, eventos de domínio e fila de jobs.
+- **Impacto:** backend, frontend e infraestrutura.
+- **Tipo:** funcional e técnico.
 
-### 32. Prontidão com prazo e contexto — P1
+### 20. Tempo real e Discord — P2
 
-Exibir quanto falta para a sessão, definir limite para confirmar e avisar quem
-ainda não respondeu. Ao expirar, o grupo pode promover alguém da espera ou
-manter a vaga, conforme sua configuração.
+Substituir polling por SSE para eventos de grupo quando o volume justificar. Iniciar Discord por webhook para votação encerrada e sessão agendada; bot interativo só deve vir após adoção comprovada.
 
-### 33. Pós-partida e histórico enriquecido — P2
+- **Valor:** melhora colaboração e encontra os grupos no canal que já utilizam.
+- **Complexidade:** média/alta.
+- **Dependências:** eventos versionados, sessões e notificações.
+- **Impacto:** API, cache do frontend e integrações.
+- **Tipo:** integração e técnico.
 
-Depois da conclusão, permitir avaliação rápida, nota privada do grupo,
-“jogar novamente” e registro opcional de resultado/duração. O histórico ganha
-busca textual, filtros por período/status e uma página de detalhe, sem virar um
-sistema complexo de placares antes de existir demanda.
+### 21. Métricas e recomendações explicáveis — P2
 
-### 34. Atividade e auditoria do grupo — P2
+Medir cadastro, entrada no primeiro grupo, primeira sugestão, votação encerrada, sessão agendada e sessão concluída. Recomendar jogos somente quando houver dados suficientes, explicando motivos como plataforma em comum e capacidade adequada.
 
-Criar uma linha do tempo para eventos relevantes: entrada/remoção de membro,
-mudança de papel, votação aberta, jogo escolhido, sessão marcada e cancelada.
-Ações administrativas devem indicar autor e horário; eventos sensíveis ficam
-visíveis apenas para admins.
+- **Valor:** orienta o roadmap por uso real e melhora descoberta sem decisões opacas.
+- **Complexidade:** média/alta.
+- **Dependências:** telemetria com privacidade, catálogo e sessões.
+- **Impacto:** produto, analytics, perfil e catálogo.
+- **Tipo:** produto e funcional.
 
-## Fase 6 — Atualizações em tempo real e notificações úteis
+## Próximos cinco passos imediatos
 
-### 35. Sincronização em tempo real — P1
-
-Substituir o polling de 10 segundos por SSE ou WebSocket autenticado para votos,
-participantes, prontidão, sessões e membros. Eventos devem ser pequenos,
-versionados e apenas invalidar/atualizar o cache necessário; manter reconexão e
-fallback para atualização manual.
-
-### 36. Central de notificações e preferências — P1
-
-Criar notificações internas lidas/não lidas com deep link e preferências por
-evento e canal. Priorizar apenas eventos acionáveis: convite/entrada, votação
-terminando, sessão confirmada/alterada, pedido de RSVP e prontidão pendente.
-Agrupar eventos repetidos para não gerar ruído.
-
-### 37. Notificações por navegador e e-mail — P1
-
-Adicionar Web Push/PWA e e-mail para lembretes importantes, sempre com opt-in,
-silêncio por horário e cancelamento fácil. Envio, retry e expiração devem rodar
-em uma fila de jobs, fora do ciclo da requisição HTTP.
-
-### 38. Integração gradual com Discord — P1
-
-Começar por webhook configurável por grupo para publicar votação, vencedor e
-sessão agendada. Depois criar bot com comandos e botões para votar/confirmar e,
-somente com demanda comprovada, sincronizar cargos ou membros. Guardar tokens
-criptografados, limitar permissões e permitir desconectar a integração.
-
-### 39. Login social, vinculação de contas e passkeys — P2
-
-Oferecer Discord e Google como métodos de entrada, além de passkeys/WebAuthn.
-Implementar vinculação e desvinculação dentro de uma conta autenticada e tratar
-com segurança e-mails coincidentes para não criar contas duplicadas nem permitir
-sequestro de conta. O login social não deve ser requisito para usar integrações.
-
-## Fase 7 — Perfil, compatibilidade e descoberta
-
-### 40. Perfil mais expressivo e controlado — P2
-
-Adicionar nome de usuário único, bio curta, fuso horário, idiomas, gêneros
-favoritos, horários habituais e visibilidade por campo. Criar perfil de membro
-acessível dentro do grupo, sem expor e-mail ou dados privados.
-
-### 41. Contas e identidades de jogos — P2
-
-Permitir informar Steam, Xbox, PlayStation, Nintendo e Riot/Epic quando fizer
-sentido. Começar por links/nomes informados manualmente; usar OAuth e importação
-de biblioteca apenas onde a API e seus termos permitirem. Cada identificador
-deve ter controle de visibilidade.
-
-### 42. Estatísticas pessoais e do grupo — P2
-
-Mostrar métricas compreensíveis, como jogos mais escolhidos, participação,
-presença, horas estimadas e frequência por plataforma/período. Não transformar
-prontidão ou ausência em ranking competitivo; as estatísticas devem ajudar o
-grupo, não constranger membros.
-
-### 43. Recomendações explicáveis — P2
-
-Recomendar jogos a partir das plataformas em comum, bibliotecas, tamanho do
-grupo, histórico e interesses declarados. Sempre explicar o motivo (“todos têm
-no PC” ou “funciona com 6 jogadores”) e permitir dispensar sugestões. Começar
-com regras simples antes de considerar modelos de recomendação.
-
-## Fase 8 — Experiência móvel, crescimento e escala
-
-### 44. PWA instalável e tolerância a conexão ruim — P2
-
-Criar manifesto, ícones, instalação guiada e cache seguro da estrutura da
-aplicação. Permitir consultar próximos eventos e últimos dados offline, mas
-exigir conexão para votos e ações que precisam de consistência.
-
-### 45. Acessibilidade e preferências de interface — P1
-
-Auditar navegação por teclado, foco, contraste, leitores de tela, redução de
-movimento, mensagens de erro e áreas de toque. Preservar tema e preferências por
-conta, não apenas no dispositivo, e testar os fluxos críticos em telas pequenas.
-
-### 46. Busca global e atalhos — P2
-
-Adicionar uma busca/command palette para abrir rapidamente grupo, jogo ou
-sessão e executar ações frequentes. Só indexar recursos que o usuário pode
-acessar e manter o estado dos filtros na URL para permitir compartilhamento e
-navegação previsível.
-
-### 47. Moderação e segurança comunitária — P2
-
-Adicionar bloqueio de usuário, denúncia de imagem/nome, remoção de mídia,
-histórico de moderação e proteção contra spam em convites e uploads. Preparar
-termos de uso, política de privacidade, canal de suporte e processo de resposta
-antes de abrir descoberta pública.
-
-### 48. Infraestrutura para crescer — P1
-
-Consolidar a fila de jobs, armazenamento de objetos e cache introduzidos nas
-fases anteriores e evoluir índices com base em medições. Adicionar backups
-testados, retenção de logs, migrações versionadas, paginação por cursor nos feeds
-movimentados, ambiente de staging e alertas de latência/erro. Não adotar serviços
-distribuídos sem uma necessidade observada.
-
-### 49. Amadurecer o painel de saúde do produto — P2
-
-Evoluir a telemetria inicial sem coletar conteúdo desnecessário: cadastro,
-entrada no primeiro grupo, primeira sugestão, votação concluída, sessão agendada
-e sessão concluída. Usar coortes de retenção, segmentação por fase do funil e
-feedback curto após ações-chave para decidir a ordem real das próximas versões.
+1. **Padronizar Node e gerenciador de pacotes** nos dois projetos e documentar o fluxo local.
+2. **Criar CI do backend com MongoDB**, garantindo que os testes de integração não sejam ignorados.
+3. **Adicionar um E2E do ciclo principal**, do cadastro à conclusão de uma partida.
+4. **Corrigir paginação em memória e limites invisíveis** nas listas atuais.
+5. **Especificar fechamento de votação e `GameSession` em ADRs**, antes de implementar agenda ou notificações.
 
 ## Itens que não devem ser prioridade agora
 
-- **Chat completo:** concorre com Discord/WhatsApp, aumenta muito o custo de
-  moderação e não melhora diretamente a decisão. Comentários curtos ligados a
-  uma sessão só devem ser avaliados depois das notificações e do Discord.
-- **Feed público ou rede social:** grupos privados são o valor central atual.
-  Descoberta pública exige privacidade e moderação maduras.
-- **Gamificação competitiva:** pontos por voto, presença ou prontidão podem
-  incentivar comportamento artificial e gerar atrito entre amigos.
-- **IA generativa como destaque:** recomendações explicáveis baseadas em dados
-  do grupo entregam valor antes de chatbots ou resumos automáticos.
-- **Aplicativos nativos separados:** uma PWA responsiva cobre primeiro a maior
-  parte do ganho móvel com menos custo de manutenção.
+- chat completo, pois compete com Discord e WhatsApp sem melhorar o núcleo da decisão;
+- feed público ou rede social, que exigiriam moderação e privacidade muito mais maduras;
+- gamificação por votos, presença ou prontidão, que pode incentivar comportamento artificial;
+- IA generativa como destaque, antes de existirem dados de compatibilidade e uso suficientes;
+- microsserviços, filas e caches distribuídos sem gargalo observado;
+- aplicativos nativos separados antes de validar uma PWA responsiva.
 
-## Marcos sugeridos
+## Marcos de evolução
 
-1. **Produto confiável:** itens 1–7 concluídos.
-2. **Grupo fácil de formar:** itens 8–14 concluídos.
-3. **Catálogo sem trabalho manual:** itens 15–20 concluídos.
-4. **Noite de jogo organizada de ponta a ponta:** itens 21–34 concluídos.
-5. **Retorno recorrente:** itens 35–43 concluídos.
-6. **Escala sustentável:** itens 44–49 concluídos conforme uso e métricas.
+1. **Base confiável:** CI, E2E, contrato automatizado, paginação e observabilidade.
+2. **Decisão clara:** convite simples, votação encerrável e participação autônoma.
+3. **Partida organizada:** `GameSession`, agenda, RSVP e calendário.
+4. **Produto recorrente:** histórico enriquecido, notificações e catálogo confiável.
+5. **Expansão validada:** Discord, tempo real, recomendações e escala conforme métricas.
