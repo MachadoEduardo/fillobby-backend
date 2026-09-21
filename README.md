@@ -6,7 +6,41 @@ O diferencial do projeto é concentrar regras de grupo no backend: voto único, 
 
 ## Desenvolvimento
 
-Instale as dependências com `npm install` e configure um arquivo `.env` a partir de `.env.example`. A API usa `MONGO_URI` e `JWT_SECRET`; em produção, o segredo JWT é obrigatório.
+Use Node.js 24.21.0 e npm 11.19.0, definidos em `.nvmrc` e `package.json`. Com o NVM instalado, prepare o ambiente nativo com:
+
+```bash
+nvm use
+npm ci
+```
+
+Configure um arquivo `.env` a partir de `.env.example`. A API usa `MONGO_URI` e `JWT_SECRET`; em produção, o segredo JWT é obrigatório. Para executar os testes de integração, `TEST_MONGO_URI` deve apontar para um banco MongoDB isolado com replica set, pois a aplicação usa transações.
+
+### Scripts principais
+
+| Comando | Finalidade |
+| --- | --- |
+| `npm run dev` | Inicia a API com recarga automática |
+| `npm run lint` | Verifica o padrão de código com ESLint |
+| `npm run lint:openapi` | Valida o contrato OpenAPI |
+| `npm test` | Executa a suíte; integrações exigem `TEST_MONGO_URI` |
+| `npm run test:ci` | Exige o banco de teste e impede integrações ignoradas |
+| `npm start` | Inicia a API sem modo de observação |
+
+### Solução completa com Docker
+
+O Compose é a forma recomendada de subir a aplicação completa sem instalar MongoDB localmente. Mantenha `fillobby-backend` e `fillobby-frontend` como diretórios irmãos e, neste diretório, execute:
+
+```bash
+docker compose up --build
+```
+
+O frontend ficará em `http://localhost:5173`, a API em `http://localhost:3000` e o MongoDB em `localhost:27017`. O banco sobe como replica set para reproduzir as transações usadas pela aplicação. Para executar os testes no container:
+
+```bash
+docker compose exec backend npm run test:ci
+```
+
+Encerre os serviços com `docker compose down`. Use `docker compose down -v` somente quando quiser apagar também os dados e dependências armazenados nos volumes locais. As imagens são destinadas a desenvolvimento e CI; os deploys continuam na Vercel e no Render.
 
 As rotas de autenticação estão disponíveis em `/api/v1/auth`:
 
@@ -76,4 +110,4 @@ O histórico está disponível em `GET /api/v1/groups/:groupId/history` para mem
 
 Itens históricos permanecem somente leitura e continuam disponíveis quando o jogo é inativado.
 
-Execute `npm test` para a suíte automatizada. Os testes de integração são executados quando `TEST_MONGO_URI` aponta para um banco MongoDB isolado.
+O CI executa lint de código, validação do OpenAPI, testes com MongoDB em replica set e build da imagem de produção. Pull requests não devem ser integrados enquanto alguma dessas verificações falhar.

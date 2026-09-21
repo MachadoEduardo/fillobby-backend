@@ -4,15 +4,18 @@
   "description": "API REST para grupos de amigos organizarem, votarem e acompanharem uma fila compartilhada de jogos.",
   "type": "module",
   "main": "app.js",
+  "packageManager": "npm@11.19.0",
   "engines": {
-    "node": "^20.19.0 || ^22.13.0 || >=24.0.0"
+    "node": ">=24.21.0 <25"
   },
   "scripts": {
     "start": "node app.js",
-    "dev": "node app.js",
+    "dev": "node --watch app.js",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
+    "lint:openapi": "redocly lint docs/openapi.yaml",
     "test": "vitest run --no-file-parallelism",
+    "test:ci": "node -e \"if (!process.env.TEST_MONGO_URI) throw new Error('TEST_MONGO_URI is required')\" && vitest run --no-file-parallelism",
     "test:watch": "vitest --no-file-parallelism"
   },
   "keywords": [],
@@ -31,6 +34,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@redocly/cli": "^2.53.3",
     "eslint": "^10.11.0",
     "globals": "^17.12.0",
     "supertest": "^7.2.2",

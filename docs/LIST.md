@@ -38,7 +38,7 @@ Limitações que devem ser tratadas antes de uma expansão grande:
 
 ## Etapa 0 — Fundação confiável
 
-### 1. Padronizar toolchain e CI — P0
+### 1. Padronizar toolchain e CI — P0 ✅
 
 Escolher uma versão de Node e um único gerenciador de pacotes para frontend e backend. Adicionar CI ao backend com lint, testes, MongoDB preparado para transações e validação do OpenAPI. Manter lint, typecheck, testes e build no frontend.
 
@@ -47,6 +47,8 @@ Escolher uma versão de Node e um único gerenciador de pacotes para frontend e 
 - **Dependências:** MongoDB de teste ou Testcontainers; definição da versão oficial do Node.
 - **Impacto:** infraestrutura, ambos os repositórios e documentação.
 - **Tipo:** técnico.
+
+**Concluído:** Node.js 24.21.0 e npm 11.19.0 foram padronizados nos dois repositórios. O backend agora possui CI com ESLint, validação OpenAPI, testes obrigatórios em MongoDB replica set e build Docker; o frontend mantém lint, typecheck, testes, build e validação da imagem. Um Compose local sobe MongoDB, API e interface sem alterar os deploys na Vercel e no Render.
 
 ### 2. Testes E2E dos fluxos centrais — P0
 
