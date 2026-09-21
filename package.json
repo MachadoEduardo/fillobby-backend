@@ -4,9 +4,14 @@
   "description": "API REST para grupos de amigos organizarem, votarem e acompanharem uma fila compartilhada de jogos.",
   "type": "module",
   "main": "app.js",
+  "engines": {
+    "node": "^20.19.0 || ^22.13.0 || >=24.0.0"
+  },
   "scripts": {
     "start": "node app.js",
     "dev": "node app.js",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
     "test": "vitest run --no-file-parallelism",
     "test:watch": "vitest --no-file-parallelism"
   },
@@ -25,6 +30,9 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.11.0",
+    "globals": "^17.12.0",
     "supertest": "^7.2.2",
     "vitest": "^4.1.10"
   }
