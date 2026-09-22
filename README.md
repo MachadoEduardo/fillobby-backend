@@ -42,6 +42,20 @@ docker compose exec backend npm run test:ci
 
 Encerre os serviços com `docker compose down`. Use `docker compose down -v` somente quando quiser apagar também os dados e dependências armazenados nos volumes locais. As imagens são destinadas a desenvolvimento e CI; os deploys continuam na Vercel e no Render.
 
+### Testes E2E
+
+Os testes Playwright ficam no frontend e usam um projeto Compose isolado, sem alterar os volumes do ambiente de desenvolvimento. Com os dois repositórios em diretórios irmãos:
+
+```bash
+docker compose --env-file .env.e2e up --build --detach --wait
+cd ../fillobby-frontend
+npm run test:e2e
+cd ../fillobby-backend
+docker compose --env-file .env.e2e down --volumes --remove-orphans
+```
+
+Esse ambiente usa frontend em `http://localhost:5174`, API em `http://localhost:3100`, MongoDB em `localhost:27018` e dados descartáveis no banco `fillobby_e2e`.
+
 As rotas de autenticação estão disponíveis em `/api/v1/auth`:
 
 - `POST /register` para criar uma conta;
@@ -110,4 +124,4 @@ O histórico está disponível em `GET /api/v1/groups/:groupId/history` para mem
 
 Itens históricos permanecem somente leitura e continuam disponíveis quando o jogo é inativado.
 
-O CI executa lint de código, validação do OpenAPI, testes com MongoDB em replica set e build da imagem de produção. Pull requests não devem ser integrados enquanto alguma dessas verificações falhar.
+O CI executa lint de código, validação do OpenAPI, testes com MongoDB em replica set, build da imagem de produção e os fluxos E2E centrais em Chromium. Pull requests não devem ser integrados enquanto alguma dessas verificações falhar.

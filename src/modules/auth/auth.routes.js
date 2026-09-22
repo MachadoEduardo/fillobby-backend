@@ -4,6 +4,7 @@ import { register, login, me } from './auth.controller.js';
 import { registerSchema, loginSchema } from './auth.validation.js';
 import { validate } from '../../middlewares/validation.middleware.js';
 import authMiddleware from '../../middlewares/auth.middleware.js';
+import env from '../../config/env.js';
 
 const router = Router();
 
@@ -20,7 +21,7 @@ function createRateLimitHandler(message) {
 
 const registerLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
-  limit: 5,
+  limit: env.authRegisterRateLimit,
   standardHeaders: true,
   legacyHeaders: false,
   handler: createRateLimitHandler('Limite de cadastros atingido. Tente novamente mais tarde.'),
@@ -28,7 +29,7 @@ const registerLimiter = rateLimit({
 
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  limit: 10,
+  limit: env.authLoginRateLimit,
   standardHeaders: true,
   legacyHeaders: false,
   handler: createRateLimitHandler(

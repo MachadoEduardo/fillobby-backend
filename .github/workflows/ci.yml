@@ -60,3 +60,65 @@ jobs:
 
       - name: Build production image
         run: docker build --target production --tag fillobby-backend:ci .
+
+  e2e:
+    runs-on: ubuntu-latest
+    needs: validate
+
+    steps:
+      - name: Checkout backend under test
+        uses: actions/checkout@v4
+        with:
+          path: fillobby-backend
+
+      - name: Checkout frontend main
+        uses: actions/checkout@v4
+        with:
+          repository: MachadoEduardo/fillobby-frontend
+          ref: main
+          path: fillobby-frontend
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: fillobby-frontend/.nvmrc
+          cache: npm
+          cache-dependency-path: fillobby-frontend/package-lock.json
+
+      - run: npm ci
+        working-directory: fillobby-frontend
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+        working-directory: fillobby-frontend
+
+      - name: Start isolated E2E stack
+        run: docker compose --env-file .env.e2e up --build --detach --wait
+        working-directory: fillobby-backend
+
+      - name: Run central E2E flows
+        run: npm run test:e2e
+        working-directory: fillobby-frontend
+        env:
+          E2E_BASE_URL: http://localhost:5174
+          E2E_API_URL: http://127.0.0.1:3100
+
+      - name: Show container logs on failure
+        if: failure()
+        run: docker compose --env-file .env.e2e logs --no-color
+        working-directory: fillobby-backend
+
+      - name: Upload E2E diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-e2e-diagnostics
+          path: |
+            fillobby-frontend/playwright-report
+            fillobby-frontend/test-results
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Stop isolated E2E stack
+        if: always()
+        run: docker compose --env-file .env.e2e down --volumes --remove-orphans
+        working-directory: fillobby-backend

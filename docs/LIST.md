@@ -28,8 +28,7 @@ Limitações que devem ser tratadas antes de uma expansão grande:
 
 - `QueueItem` representa sugestão, votação, formação de time, partida e histórico ao mesmo tempo;
 - services de grupos e fila concentram regras, persistência e coordenação entre módulos;
-- testes de integração do backend são ignorados sem `TEST_MONGO_URI` e não existe CI do backend;
-- o frontend testa principalmente o cliente HTTP, sem E2E dos fluxos reais;
+- a base de CI e E2E está pronta, mas deve crescer junto com cada novo fluxo de negócio relevante;
 - JWT fica no `localStorage`, sem revogação, recuperação de senha ou ciclo de sessões;
 - paginação de grupos ocorre em memória e a interface usa limites fixos de 50/100 itens;
 - polling frequente substitui uma estratégia de sincronização orientada a eventos;
@@ -50,7 +49,7 @@ Escolher uma versão de Node e um único gerenciador de pacotes para frontend e 
 
 **Concluído:** Node.js 24.21.0 e npm 11.19.0 foram padronizados nos dois repositórios. O backend agora possui CI com ESLint, validação OpenAPI, testes obrigatórios em MongoDB replica set e build Docker; o frontend mantém lint, typecheck, testes, build e validação da imagem. Um Compose local sobe MongoDB, API e interface sem alterar os deploys na Vercel e no Render.
 
-### 2. Testes E2E dos fluxos centrais — P0
+### 2. Testes E2E dos fluxos centrais — P0 ✅
 
 Adicionar Playwright para cadastro/login, criação ou entrada em grupo, sugestão, votação, seleção de participantes, prontidão e conclusão. O backend deve falhar na CI quando o banco de integração não estiver configurado, em vez de ignorar a maior parte da suíte.
 
@@ -59,6 +58,8 @@ Adicionar Playwright para cadastro/login, criação ou entrada em grupo, sugest�
 - **Dependências:** ambiente de teste determinístico e dados descartáveis.
 - **Impacto:** frontend, backend e CI.
 - **Tipo:** qualidade.
+
+**Concluído:** Playwright em Chromium valida a proteção de autenticação e uma jornada com dois usuários, cobrindo cadastro, login, criação e entrada em grupo, catálogo, sugestão, votação, participantes, prontidão, conclusão e histórico. O Compose E2E usa portas, banco e volumes isolados; ambos os repositórios executam o cenário como verificação obrigatória combinando o código em validação com a `main` do projeto irmão. Em falhas, CI publica relatório, screenshot, vídeo e trace.
 
 ### 3. OpenAPI como fonte única — P0
 
@@ -260,10 +261,10 @@ Medir cadastro, entrada no primeiro grupo, primeira sugestão, votação encerra
 
 ## Próximos cinco passos imediatos
 
-1. **Padronizar Node e gerenciador de pacotes** nos dois projetos e documentar o fluxo local.
-2. **Criar CI do backend com MongoDB**, garantindo que os testes de integração não sejam ignorados.
-3. **Adicionar um E2E do ciclo principal**, do cadastro à conclusão de uma partida.
-4. **Corrigir paginação em memória e limites invisíveis** nas listas atuais.
+1. **Gerar tipos e cliente TypeScript pelo OpenAPI**, reduzindo divergência entre os projetos.
+2. **Corrigir paginação em memória e limites invisíveis** nas listas atuais.
+3. **Adicionar logs estruturados, request ID e readiness do MongoDB** para melhorar diagnóstico operacional.
+4. **Definir contextos e políticas de domínio em um ADR**, orientando a evolução incremental para DDD.
 5. **Especificar fechamento de votação e `GameSession` em ADRs**, antes de implementar agenda ou notificações.
 
 ## Itens que não devem ser prioridade agora

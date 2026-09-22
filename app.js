@@ -15,7 +15,9 @@ import { errorMiddleware, notFoundMiddleware } from './src/middlewares/error.mid
 
 const app = express();
 const localOrigins = ['http://localhost:8080', 'http://localhost:5173', 'http://127.0.0.1:8080', 'http://127.0.0.1:5173'];
-const allowedOrigins = env.nodeEnv === 'production' ? [env.frontendUrl] : localOrigins;
+const allowedOrigins = env.nodeEnv === 'production'
+  ? [env.frontendUrl]
+  : [...new Set([...localOrigins, env.frontendUrl].filter(Boolean))];
 
 app.use(helmet());
 app.use(cors({
