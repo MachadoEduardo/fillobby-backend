@@ -125,3 +125,12 @@ O histórico está disponível em `GET /api/v1/groups/:groupId/history` para mem
 Itens históricos permanecem somente leitura e continuam disponíveis quando o jogo é inativado.
 
 O CI executa lint de código, validação do OpenAPI, testes com MongoDB em replica set, build da imagem de produção e os fluxos E2E centrais em Chromium. Pull requests não devem ser integrados enquanto alguma dessas verificações falhar.
+
+O arquivo `docs/openapi.yaml` é o contrato oficial da API. Os testes de contrato
+em `tests/openapi-contract.test.js` validam respostas reais dos fluxos centrais
+contra os schemas publicados. Ao alterar uma resposta, atualize primeiro o
+contrato e o teste (TDD), execute `npm run lint:openapi` e `npm run test:ci`, e
+depois sincronize o snapshot do frontend. Use `info.version` com SemVer: patch
+para correções documentais, minor para mudanças compatíveis e major para
+quebras; mudanças incompatíveis em `/api/v1` exigem versão nova ou migração
+coordenada.
