@@ -69,14 +69,15 @@ export async function update(req, res, next) {
 
 export async function join(req, res, next) {
   try {
+    const { group, joined } = await groupsService.joinGroup({
+      userId: actor(req),
+      ...req.body,
+    });
     return res
-      .status(201)
+      .status(joined ? 201 : 200)
       .json({
         success: true,
-        data: await groupsService.joinGroup({
-          userId: actor(req),
-          ...req.body,
-        }),
+        data: group,
       });
   } catch (error) {
     return next(error);

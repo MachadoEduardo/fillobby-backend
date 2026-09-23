@@ -107,13 +107,15 @@ Definir os contextos Identidade, Grupos, Catálogo, Decisão/Fila e Sessões. Ex
 
 ### 7. Convite por link e onboarding curto — P1
 
-Criar `/invite/:code`, preservar o convite durante login/cadastro, permitir compartilhamento nativo e orientar o novo usuário até entrar em um grupo e sugerir o primeiro jogo. Depois, adicionar validade, limite de usos e revogação por convite.
+Criar `/invite/:code` e facilitar o compartilhamento do link. Quem ainda não estiver autenticado deve poder fazer login ou cadastro sem perder o convite; depois, entra no grupo e é levado diretamente à página dele. Se já for membro, abrir o grupo; se o convite for inválido ou a pessoa tiver sido removida, mostrar uma mensagem clara. Na página do grupo, oferecer apenas uma orientação opcional para conhecer a fila ou sugerir um jogo — sem tour ou checklist obrigatório. Avaliar validade e limite de usos somente se o uso real justificar; a regeneração do código atual já permite revogar convites compartilhados.
 
 - **Valor:** reduz o maior atrito de aquisição e ativação.
 - **Complexidade:** baixa/média.
 - **Dependências:** rota pública segura e redirecionamento pós-login.
 - **Impacto:** autenticação, grupos e frontend.
 - **Tipo:** funcional e UX.
+
+**Concluído:** `/invite/:code` preserva o convite no cadastro/login, exige confirmação para entrar e abre o grupo após sucesso. O ingresso de membro ativo é idempotente (`200`); convite inválido e membro removido recebem mensagens específicas. Administradores podem compartilhar o link pelo botão do grupo. A orientação curta já é dada pelo estado vazio da fila; não há tour obrigatório, prazo ou limite de usos.
 
 ### 8. Fechamento real de votação — P1
 

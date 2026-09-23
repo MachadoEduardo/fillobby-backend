@@ -94,6 +94,24 @@ integration("groups integration", () => {
     expect(detail.body.data.inviteCode).toBeUndefined();
   });
 
+  it("returns the group without duplicating membership when an active member follows the invite", async () => {
+    const owner = await register("Owner User", "owner@example.com");
+    const created = await request(app)
+      .post("/api/v1/groups")
+      .set("Authorization", `Bearer ${owner.token}`)
+      .send({ name: "Grupo Privado" });
+
+    const repeated = await request(app)
+      .post("/api/v1/groups/join")
+      .set("Authorization", `Bearer ${owner.token}`)
+      .send({ inviteCode: created.body.data.inviteCode });
+
+    expect(repeated.status).toBe(200);
+    expect(repeated.body.data.id).toBe(created.body.data.id);
+    expect(repeated.body.data.role).toBe("OWNER");
+    expect(await GroupMember.countDocuments({ group: created.body.data.id, user: owner.id })).toBe(1);
+  });
+
   it("enforces membership and role permissions", async () => {
     const owner = await register("Owner User", "owner@example.com");
     const outsider = await register("Outsider User", "outsider@example.com");
@@ -163,6 +181,12 @@ integration("groups integration", () => {
       .delete(`/api/v1/groups/${created.body.data.id}/members/${member.id}`)
       .set("Authorization", `Bearer ${owner.token}`);
     expect(removed.status).toBe(200);
+    const deniedRejoin = await request(app)
+      .post("/api/v1/groups/join")
+      .set("Authorization", `Bearer ${member.token}`)
+      .send({ inviteCode: created.body.data.inviteCode });
+    expect(deniedRejoin.status).toBe(403);
+    expect(deniedRejoin.body.error.code).toBe("MEMBERSHIP_REMOVED");
     const updated = await QueueItem.findById(item._id);
     expect(updated.participants).toHaveLength(0);
     expect(updated.readyUsers).toHaveLength(0);

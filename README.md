@@ -71,7 +71,7 @@ As rotas de grupos estão disponíveis em `/api/v1/groups`:
 
 - `POST /` para criar um grupo;
 - `GET /` e `GET /:groupId` para listar e detalhar grupos acessíveis;
-- `POST /join` para entrar usando convite;
+- `POST /join` para entrar usando convite (`201` para novo membro, `200` para membro ativo que abriu o convite novamente);
 - `GET /:groupId/members` para listar membros;
 - `PATCH /:groupId` e `DELETE /:groupId` para administrar o grupo;
 - `PATCH /:groupId/members/:userId/role`, `DELETE /:groupId/members/:userId` e `POST /:groupId/transfer-owner` para administração de membros e propriedade.

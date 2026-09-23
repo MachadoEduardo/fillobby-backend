@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
   title: Fillobby API
-  version: 1.0.0
+  version: 2.0.0
   description: |
     API REST para grupos de amigos organizarem uma fila compartilhada de jogos.
 
@@ -352,6 +352,12 @@ paths:
             schema:
               $ref: "#/components/schemas/JoinGroupInput"
       responses:
+        "200":
+          description: Usuário já participava do grupo; retorna seus dados atuais sem criar outra associação.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GroupSuccess"
         "201":
           description: Usuário adicionado como `MEMBER`. O código de convite não é retornado.
           content:
@@ -368,12 +374,6 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
         "404":
           description: "`INVITE_NOT_FOUND`: convite inexistente ou grupo inativo."
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "409":
-          description: "`ALREADY_GROUP_MEMBER`: usuário já participa do grupo."
           content:
             application/json:
               schema:

@@ -93,6 +93,10 @@ integration("OpenAPI central flow contract", () => {
     expect(group.status).toBe(201);
     assertResponse("post", "/api/v1/groups", group);
     const groupId = group.body.data.id;
+    const repeatedJoin = await request(app).post("/api/v1/groups/join")
+      .set("Authorization", authorization).send({ inviteCode: group.body.data.inviteCode });
+    expect(repeatedJoin.status).toBe(200);
+    assertResponse("post", "/api/v1/groups/join", repeatedJoin);
     const groups = await request(app).get("/api/v1/groups").set("Authorization", authorization);
     assertResponse("get", "/api/v1/groups", groups);
     const game = await request(app).post("/api/v1/games")

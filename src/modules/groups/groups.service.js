@@ -290,11 +290,10 @@ export async function joinGroup({ userId, inviteCode: code }) {
   });
 
   if (existing?.status === "ACTIVE")
-    throw new AppError(
-      "ALREADY_GROUP_MEMBER",
-      "Voce ja participa deste grupo.",
-      409,
-    );
+    return {
+      group: serializeGroup(group, existing, ["OWNER", "ADMIN"].includes(existing.role)),
+      joined: false,
+    };
 
   if (existing?.status === "REMOVED")
     throw new AppError(
@@ -316,14 +315,22 @@ export async function joinGroup({ userId, inviteCode: code }) {
           role: "MEMBER",
           status: "ACTIVE",
         });
-    return serializeGroup(group, membership, false);
+    return { group: serializeGroup(group, membership, false), joined: true };
   } catch (error) {
-    if (error?.code === 11000)
-      throw new AppError(
-        "ALREADY_GROUP_MEMBER",
-        "Voce ja participa deste grupo.",
-        409,
-      );
+    if (error?.code === 11000) {
+      const current = await GroupMember.findOne({ group: group._id, user: userId });
+      if (current?.status === "ACTIVE")
+        return {
+          group: serializeGroup(group, current, ["OWNER", "ADMIN"].includes(current.role)),
+          joined: false,
+        };
+      if (current?.status === "REMOVED")
+        throw new AppError(
+          "MEMBERSHIP_REMOVED",
+          "Este usuario foi removido do grupo.",
+          403,
+        );
+    }
     throw error;
   }
 }
