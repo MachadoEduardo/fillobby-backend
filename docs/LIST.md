@@ -11,7 +11,7 @@ Este documento é um backlog priorizado, não um compromisso de implementar tudo
 - **P0:** corrige risco, inconsistência ou bloqueio da evolução.
 - **P1:** entrega valor direto e recorrente ao usuário.
 - **P2:** aumenta conveniência ou retenção depois que o fluxo principal estiver validado.
-- Toda entrega deve considerar backend, frontend, OpenAPI, testes, segurança, acessibilidade e estados de loading, erro e vazio.
+- Em cada entrega, revise apenas as camadas afetadas: contrato, testes, segurança, acessibilidade e estados da interface quando forem relevantes. Evite infraestrutura ou cobertura sem benefício concreto.
 - Novas regras devem seguir TDD, com foco em testes E2E dos fluxos importantes, não em cobertura artificial.
 
 ## Diagnóstico atual
@@ -61,7 +61,7 @@ Adicionar Playwright para cadastro/login, criação ou entrada em grupo, sugest�
 
 **Concluído:** Playwright em Chromium valida a proteção de autenticação e uma jornada com dois usuários, cobrindo cadastro, login, criação e entrada em grupo, catálogo, sugestão, votação, participantes, prontidão, conclusão e histórico. O Compose E2E usa portas, banco e volumes isolados; ambos os repositórios executam o cenário como verificação obrigatória combinando o código em validação com a `main` do projeto irmão. Em falhas, CI publica relatório, screenshot, vídeo e trace.
 
-### 3. OpenAPI como fonte única — P0
+### 3. OpenAPI como fonte única — P0 ✅
 
 Gerar tipos e cliente TypeScript a partir do contrato, validar o YAML na CI e adicionar testes de contrato para respostas importantes.
 
@@ -70,6 +70,8 @@ Gerar tipos e cliente TypeScript a partir do contrato, validar o YAML na CI e ad
 - **Dependências:** escolha do gerador e política de versionamento.
 - **Impacto:** documentação, API e frontend.
 - **Tipo:** técnico e arquitetural.
+
+**Concluído:** `docs/openapi.yaml` é validado na CI do backend e serve de origem para o snapshot versionado, os tipos e o cliente tipado do frontend. A CI do frontend verifica a geração e compara o snapshot com a `main` do backend; testes de contrato verificam respostas reais dos fluxos principais. O upload binário mantém tratamento específico. Isso não equivale a validar todas as respostas em runtime: os retornos `429` de autenticação, por exemplo, têm teste de comportamento, mas ainda não possuem schema de resposta no YAML. Corrija essa lacuna quando o fluxo de autenticação for revisado, sem ampliar a infraestrutura de contrato por cobertura artificial. Reavalie a comparação rígida entre repositórios se ela passar a bloquear mudanças documentais sem valor para o cliente.
 
 ### 4. Paginação e consultas previsíveis — P0
 
@@ -261,11 +263,11 @@ Medir cadastro, entrada no primeiro grupo, primeira sugestão, votação encerra
 
 ## Próximos cinco passos imediatos
 
-1. **Gerar tipos e cliente TypeScript pelo OpenAPI**, reduzindo divergência entre os projetos.
-2. **Corrigir paginação em memória e limites invisíveis** nas listas atuais.
-3. **Adicionar logs estruturados, request ID e readiness do MongoDB** para melhorar diagnóstico operacional.
-4. **Definir contextos e políticas de domínio em um ADR**, orientando a evolução incremental para DDD.
-5. **Especificar fechamento de votação e `GameSession` em ADRs**, antes de implementar agenda ou notificações.
+1. **Corrigir paginação em memória e limites invisíveis** nas listas atuais.
+2. **Adicionar logs estruturados, request ID e readiness do MongoDB** para melhorar diagnóstico operacional.
+3. **Definir contextos e políticas de domínio em um ADR**, orientando a evolução incremental para DDD.
+4. **Especificar fechamento de votação e `GameSession` em ADRs**, antes de implementar agenda ou notificações.
+5. **Simplificar convites por link e onboarding**, após estabilizar as listas e permissões envolvidas.
 
 ## Itens que não devem ser prioridade agora
 
