@@ -32,12 +32,7 @@ async function withTransaction(work) {
 
 async function findQueueItem(groupId, itemId) {
   const item = await QueueItem.findOne({ _id: itemId, group: groupId });
-  if (!item)
-    throw new AppError(
-      "QUEUE_ITEM_NOT_FOUND",
-      "Item da fila nao encontrado.",
-      404,
-    );
+  if (!item) throw new AppError("QUEUE_ITEM_NOT_FOUND", "Item da fila nao encontrado.", 404);
   return item;
 }
 
@@ -62,8 +57,7 @@ export async function createVote({ groupId, itemId, userId }) {
   const { group } = await getActiveGroupContext(groupId, userId);
   const item = await findQueueItem(group._id, itemId);
   ensureVoting(item);
-  if (await Vote.exists({ queueItem: item._id, user: userId }))
-    throw voteAlreadyExistsError();
+  if (await Vote.exists({ queueItem: item._id, user: userId })) throw voteAlreadyExistsError();
 
   let result;
   try {
@@ -85,10 +79,7 @@ export async function createVote({ groupId, itemId, userId }) {
     throw error;
   }
 
-  const vote = await Vote.findById(result.voteId).populate(
-    "user",
-    "name avatarUrl",
-  );
+  const vote = await Vote.findById(result.voteId).populate("user", "name avatarUrl");
   return { vote: serializeVote(vote), voteCount: result.voteCount };
 }
 
@@ -101,12 +92,8 @@ export async function removeVote({ groupId, itemId, userId }) {
   }
 
   const voteCount = await withTransaction(async (session) => {
-    const vote = await Vote.findOneAndDelete(
-      { queueItem: item._id, user: userId },
-      { session },
-    );
-    if (!vote)
-      throw new AppError("VOTE_NOT_FOUND", "Voto nao encontrado.", 404);
+    const vote = await Vote.findOneAndDelete({ queueItem: item._id, user: userId }, { session });
+    if (!vote) throw new AppError("VOTE_NOT_FOUND", "Voto nao encontrado.", 404);
 
     const updatedItem = await QueueItem.findOneAndUpdate(
       {
@@ -120,8 +107,7 @@ export async function removeVote({ groupId, itemId, userId }) {
     );
     if (!updatedItem) {
       const currentItem = await QueueItem.findById(item._id).session(session);
-      if (currentItem?.status !== QUEUE_STATUS.VOTING)
-        throw queueNotVotingError();
+      if (currentItem?.status !== QUEUE_STATUS.VOTING) throw queueNotVotingError();
       throw new AppError(
         "VOTE_COUNT_INCONSISTENT",
         "Nao foi possivel atualizar a contagem de votos.",

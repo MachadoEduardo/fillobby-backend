@@ -31,7 +31,10 @@ function assertResponse(method, path, response) {
   const operation = contract.paths[path]?.[method];
   expect(operation, `Missing OpenAPI operation ${method.toUpperCase()} ${path}`).toBeDefined();
   const declared = operation.responses[String(response.status)];
-  expect(declared, `Undocumented HTTP ${response.status} for ${method.toUpperCase()} ${path}`).toBeDefined();
+  expect(
+    declared,
+    `Undocumented HTTP ${response.status} for ${method.toUpperCase()} ${path}`,
+  ).toBeDefined();
   const definition = declared.$ref
     ? contract.components.responses[declared.$ref.split("/").at(-1)]
     : declared;
@@ -90,68 +93,92 @@ integration("OpenAPI central flow contract", () => {
     const me = await request(app).get("/api/v1/auth/me").set("Authorization", authorization);
     assertResponse("get", "/api/v1/auth/me", me);
 
-    const group = await request(app).post("/api/v1/groups")
-      .set("Authorization", authorization).send({ name: "Contract Group" });
+    const group = await request(app)
+      .post("/api/v1/groups")
+      .set("Authorization", authorization)
+      .send({ name: "Contract Group" });
     expect(group.status).toBe(201);
     assertResponse("post", "/api/v1/groups", group);
     const groupId = group.body.data.id;
-    const repeatedJoin = await request(app).post("/api/v1/groups/join")
-      .set("Authorization", authorization).send({ inviteCode: group.body.data.inviteCode });
+    const repeatedJoin = await request(app)
+      .post("/api/v1/groups/join")
+      .set("Authorization", authorization)
+      .send({ inviteCode: group.body.data.inviteCode });
     expect(repeatedJoin.status).toBe(200);
     assertResponse("post", "/api/v1/groups/join", repeatedJoin);
     const groups = await request(app).get("/api/v1/groups").set("Authorization", authorization);
     assertResponse("get", "/api/v1/groups", groups);
-    const game = await request(app).post("/api/v1/games")
-      .set("Authorization", authorization).send({ title: "Portal 2", platforms: ["PC"] });
+    const game = await request(app)
+      .post("/api/v1/games")
+      .set("Authorization", authorization)
+      .send({ title: "Portal 2", platforms: ["PC"] });
     expect(game.status).toBe(201);
     assertResponse("post", "/api/v1/games", game);
     const gameId = game.body.data.game.id;
     const queuePath = "/api/v1/groups/{groupId}/queue";
-    const queue = await request(app).post(`/api/v1/groups/${groupId}/queue`)
-      .set("Authorization", authorization).send({ gameId });
+    const queue = await request(app)
+      .post(`/api/v1/groups/${groupId}/queue`)
+      .set("Authorization", authorization)
+      .send({ gameId });
     expect(queue.status).toBe(201);
     assertResponse("post", queuePath, queue);
     const itemId = queue.body.data.id;
-    const queueList = await request(app).get(`/api/v1/groups/${groupId}/queue`)
+    const queueList = await request(app)
+      .get(`/api/v1/groups/${groupId}/queue`)
       .set("Authorization", authorization);
     assertResponse("get", queuePath, queueList);
     const roundsPath = "/api/v1/groups/{groupId}/voting-rounds";
-    const voting = await request(app).post(`/api/v1/groups/${groupId}/voting-rounds`)
-      .set("Authorization", authorization).send({ candidateIds: [itemId] });
+    const voting = await request(app)
+      .post(`/api/v1/groups/${groupId}/voting-rounds`)
+      .set("Authorization", authorization)
+      .send({ candidateIds: [itemId] });
     expect(voting.status).toBe(201);
     assertResponse("post", roundsPath, voting);
     const votePath = "/api/v1/groups/{groupId}/queue/{itemId}/votes";
-    const vote = await request(app).post(`/api/v1/groups/${groupId}/queue/${itemId}/votes`)
+    const vote = await request(app)
+      .post(`/api/v1/groups/${groupId}/queue/${itemId}/votes`)
       .set("Authorization", authorization);
     expect(vote.status).toBe(201);
     assertResponse("post", votePath, vote);
-    const duplicate = await request(app).post(`/api/v1/groups/${groupId}/queue/${itemId}/votes`)
+    const duplicate = await request(app)
+      .post(`/api/v1/groups/${groupId}/queue/${itemId}/votes`)
       .set("Authorization", authorization);
     expect(duplicate.status).toBe(409);
     assertResponse("post", votePath, duplicate);
     const closePath = "/api/v1/groups/{groupId}/voting-rounds/{roundId}/close";
-    const closed = await request(app).post(`/api/v1/groups/${groupId}/voting-rounds/${voting.body.data.id}/close`)
-      .set("Authorization", authorization).send({});
+    const closed = await request(app)
+      .post(`/api/v1/groups/${groupId}/voting-rounds/${voting.body.data.id}/close`)
+      .set("Authorization", authorization)
+      .send({});
     expect(closed.status).toBe(200);
     assertResponse("post", closePath, closed);
     const selfEnrollmentPath = "/api/v1/groups/{groupId}/queue/{itemId}/self-enrollment";
-    const enabled = await request(app).patch(`/api/v1/groups/${groupId}/queue/${itemId}/self-enrollment`)
-      .set("Authorization", authorization).send({ enabled: true });
+    const enabled = await request(app)
+      .patch(`/api/v1/groups/${groupId}/queue/${itemId}/self-enrollment`)
+      .set("Authorization", authorization)
+      .send({ enabled: true });
     assertResponse("patch", selfEnrollmentPath, enabled);
     const ownPath = "/api/v1/groups/{groupId}/queue/{itemId}/participants/me";
-    const joined = await request(app).post(`/api/v1/groups/${groupId}/queue/${itemId}/participants/me`)
-      .set("Authorization", authorization).send({});
+    const joined = await request(app)
+      .post(`/api/v1/groups/${groupId}/queue/${itemId}/participants/me`)
+      .set("Authorization", authorization)
+      .send({});
     assertResponse("post", ownPath, joined);
-    const adjusted = await request(app).patch(`/api/v1/groups/${groupId}/queue/${itemId}/participants`)
-      .set("Authorization", authorization).send({ addIds: [], removeIds: [] });
+    const adjusted = await request(app)
+      .patch(`/api/v1/groups/${groupId}/queue/${itemId}/participants`)
+      .set("Authorization", authorization)
+      .send({ addIds: [], removeIds: [] });
     assertResponse("patch", "/api/v1/groups/{groupId}/queue/{itemId}/participants", adjusted);
-    const left = await request(app).delete(`/api/v1/groups/${groupId}/queue/${itemId}/participants/me`)
+    const left = await request(app)
+      .delete(`/api/v1/groups/${groupId}/queue/${itemId}/participants/me`)
       .set("Authorization", authorization);
     assertResponse("delete", ownPath, left);
-    const rounds = await request(app).get(`/api/v1/groups/${groupId}/voting-rounds`)
+    const rounds = await request(app)
+      .get(`/api/v1/groups/${groupId}/voting-rounds`)
       .set("Authorization", authorization);
     assertResponse("get", roundsPath, rounds);
-    const history = await request(app).get(`/api/v1/groups/${groupId}/history`)
+    const history = await request(app)
+      .get(`/api/v1/groups/${groupId}/history`)
       .set("Authorization", authorization);
     assertResponse("get", "/api/v1/groups/{groupId}/history", history);
   });

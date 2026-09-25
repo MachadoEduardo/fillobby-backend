@@ -10,22 +10,18 @@ import UserAvatar from "../src/models/UserAvatar.js";
 
 describe("profile contract", () => {
   it("requires authentication to update the profile", async () => {
-    const response = await request(app)
-      .patch("/api/v1/profile")
-      .send({ name: "Novo nome" });
+    const response = await request(app).patch("/api/v1/profile").send({ name: "Novo nome" });
 
     expect(response.status).toBe(401);
     expect(response.body.error.code).toBe("AUTH_TOKEN_REQUIRED");
   });
 
   it("requires authentication to change the password", async () => {
-    const response = await request(app)
-      .patch("/api/v1/profile/password")
-      .send({
-        currentPassword: "SenhaAntiga123",
-        newPassword: "NovaSenha123",
-        confirmPassword: "NovaSenha123",
-      });
+    const response = await request(app).patch("/api/v1/profile/password").send({
+      currentPassword: "SenhaAntiga123",
+      newPassword: "NovaSenha123",
+      confirmPassword: "NovaSenha123",
+    });
 
     expect(response.status).toBe(401);
     expect(response.body.error.code).toBe("AUTH_TOKEN_REQUIRED");
@@ -115,10 +111,7 @@ integration("profile integration", () => {
       id: user._id.toString(),
       preferredPlatforms: ["PC", "Switch"],
     });
-    expect((await User.findById(user._id)).preferredPlatforms).toEqual([
-      "PC",
-      "Switch",
-    ]);
+    expect((await User.findById(user._id)).preferredPlatforms).toEqual(["PC", "Switch"]);
 
     const clear = await request(app)
       .patch("/api/v1/profile/preferences")
@@ -213,9 +206,7 @@ integration("profile integration", () => {
     });
 
     const storedUser = await User.findById(user._id).select("+passwordHash");
-    expect(await bcrypt.compare("SenhaAntiga123", storedUser.passwordHash)).toBe(
-      true,
-    );
+    expect(await bcrypt.compare("SenhaAntiga123", storedUser.passwordHash)).toBe(true);
   });
 
   it("rejects reusing the current password", async () => {
@@ -240,18 +231,12 @@ integration("profile integration", () => {
     });
 
     const storedUser = await User.findById(user._id).select("+passwordHash");
-    expect(await bcrypt.compare("SenhaAntiga123", storedUser.passwordHash)).toBe(
-      true,
-    );
+    expect(await bcrypt.compare("SenhaAntiga123", storedUser.passwordHash)).toBe(true);
   });
 
   it("uploads, serves and replaces the avatar without duplicating it", async () => {
-    const firstImage = Buffer.from([
-      0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x01,
-    ]);
-    const secondImage = Buffer.from([
-      0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46,
-    ]);
+    const firstImage = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x01]);
+    const secondImage = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46]);
 
     const upload = await request(app)
       .put("/api/v1/profile/avatar")
@@ -267,9 +252,7 @@ integration("profile integration", () => {
     const avatarResponse = await request(app).get(upload.body.data.avatarUrl);
     expect(avatarResponse.status).toBe(200);
     expect(avatarResponse.headers["content-type"]).toBe("image/png");
-    expect(avatarResponse.headers["cross-origin-resource-policy"]).toBe(
-      "cross-origin",
-    );
+    expect(avatarResponse.headers["cross-origin-resource-policy"]).toBe("cross-origin");
     expect(avatarResponse.body).toEqual(firstImage);
 
     const replacement = await request(app)
@@ -318,9 +301,7 @@ integration("profile integration", () => {
   });
 
   it("removes the current avatar", async () => {
-    const image = Buffer.from([
-      0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x01,
-    ]);
+    const image = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x01]);
     await request(app)
       .put("/api/v1/profile/avatar")
       .set("Authorization", `Bearer ${token}`)

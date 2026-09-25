@@ -101,6 +101,17 @@ integration("queue participants and readiness integration", () => {
     return `/api/v1/groups/${groupId}/queue/${itemId}/ready`;
   }
 
+  function selfEnrollmentPath(groupId, itemId) {
+    return `/api/v1/groups/${groupId}/queue/${itemId}/self-enrollment`;
+  }
+
+  function setSelfEnrollment(owner, group, item, enabled = true) {
+    return request(app)
+      .patch(selfEnrollmentPath(group.id, item.id))
+      .set("Authorization", `Bearer ${owner.token}`)
+      .send({ enabled });
+  }
+
   it("lets an administrator select active members and closes voting", async () => {
     const { owner, first, second, group, item } = await createContext();
     const response = await request(app)
@@ -208,9 +219,7 @@ integration("queue participants and readiness integration", () => {
       .send({});
     expect(firstReady.status).toBe(200);
     expect(firstReady.body.data.status).toBe("WAITING_PLAYERS");
-    expect(firstReady.body.data.readyUserIds).toEqual([
-      first.user._id.toString(),
-    ]);
+    expect(firstReady.body.data.readyUserIds).toEqual([first.user._id.toString()]);
 
     const repeated = await request(app)
       .post(readyPath(group._id, item._id))
@@ -265,8 +274,7 @@ integration("queue participants and readiness integration", () => {
   });
 
   it("keeps readiness as a subset when participants are adjusted", async () => {
-    const { owner, first, second, group, item } =
-      await createContext("WAITING_PLAYERS");
+    const { owner, first, second, group, item } = await createContext("WAITING_PLAYERS");
     item.participants = [first.user._id, second.user._id];
     item.readyUsers = [first.user._id];
     await item.save();
@@ -277,12 +285,8 @@ integration("queue participants and readiness integration", () => {
       .send({ participantIds: [first.user._id] });
 
     expect(response.status).toBe(200);
-    expect(response.body.data.participantIds).toEqual([
-      first.user._id.toString(),
-    ]);
-    expect(response.body.data.readyUserIds).toEqual([
-      first.user._id.toString(),
-    ]);
+    expect(response.body.data.participantIds).toEqual([first.user._id.toString()]);
+    expect(response.body.data.readyUserIds).toEqual([first.user._id.toString()]);
     expect(response.body.data.status).toBe("READY");
   });
 
@@ -313,53 +317,108 @@ integration("queue participants and readiness integration", () => {
 
   it("allows only admins to enable self-enrollment after voting", async () => {
     const { owner, first, group, item } = await createContext("WAITING_PLAYERS");
-    const path = `/api/v1/groups/${group.id}/queue/${item.id}/self-enrollment`;
-    expect((await request(app).patch(path).set("Authorization", `Bearer ${first.token}`).send({ enabled: true })).status).toBe(403);
-    const enabled = await request(app).patch(path).set("Authorization", `Bearer ${owner.token}`).send({ enabled: true });
+    const memberAttempt = await request(app)
+      .patch(selfEnrollmentPath(group.id, item.id))
+      .set("Authorization", `Bearer ${first.token}`)
+      .send({ enabled: true });
+    expect(memberAttempt.status).toBe(403);
+
+    const enabled = await setSelfEnrollment(owner, group, item);
     expect(enabled.status).toBe(200);
     expect(enabled.body.data.selfEnrollmentEnabled).toBe(true);
-    expect((await request(app).put(participantsPath(group.id, item.id)).set("Authorization", `Bearer ${owner.token}`).send({ participantIds: [first.user.id] })).status).toBe(409);
+
+    const legacySelection = await request(app)
+      .put(participantsPath(group.id, item.id))
+      .set("Authorization", `Bearer ${owner.token}`)
+      .send({ participantIds: [first.user.id] });
+    expect(legacySelection.status).toBe(409);
   });
 
   it("lets members join, become ready, and leave before play while respecting capacity", async () => {
     const { owner, first, second, group, item } = await createContext("WAITING_PLAYERS", 1);
     const base = participantsPath(group.id, item.id);
-    expect((await request(app).post(`${base}/me`).set("Authorization", `Bearer ${first.token}`).send({})).status).toBe(409);
-    await request(app).patch(`/api/v1/groups/${group.id}/queue/${item.id}/self-enrollment`).set("Authorization", `Bearer ${owner.token}`).send({ enabled: true });
-    const joined = await request(app).post(`${base}/me`).set("Authorization", `Bearer ${first.token}`).send({});
+    const closed = await request(app)
+      .post(`${base}/me`)
+      .set("Authorization", `Bearer ${first.token}`)
+      .send({});
+    expect(closed.status).toBe(409);
+    await setSelfEnrollment(owner, group, item);
+    const joined = await request(app)
+      .post(`${base}/me`)
+      .set("Authorization", `Bearer ${first.token}`)
+      .send({});
     expect(joined.status).toBe(200);
     expect(joined.body.data.participantIds).toEqual([first.user.id]);
     expect(joined.body.data.status).toBe("WAITING_PLAYERS");
-    expect((await request(app).post(`${base}/me`).set("Authorization", `Bearer ${second.token}`).send({})).status).toBe(409);
-    expect((await request(app).post(readyPath(group.id, item.id)).set("Authorization", `Bearer ${first.token}`).send({})).body.data.status).toBe("READY");
-    const left = await request(app).delete(`${base}/me`).set("Authorization", `Bearer ${first.token}`);
+    const full = await request(app)
+      .post(`${base}/me`)
+      .set("Authorization", `Bearer ${second.token}`)
+      .send({});
+    expect(full.status).toBe(409);
+
+    const ready = await request(app)
+      .post(readyPath(group.id, item.id))
+      .set("Authorization", `Bearer ${first.token}`)
+      .send({});
+    expect(ready.body.data.status).toBe("READY");
+    const left = await request(app)
+      .delete(`${base}/me`)
+      .set("Authorization", `Bearer ${first.token}`);
     expect(left.status).toBe(200);
-    expect(left.body.data).toMatchObject({ status: "WAITING_PLAYERS", participantIds: [], readyUserIds: [] });
-    expect((await request(app).delete(`${base}/me`).set("Authorization", `Bearer ${first.token}`)).status).toBe(200);
+    expect(left.body.data).toMatchObject({
+      status: "WAITING_PLAYERS",
+      participantIds: [],
+      readyUserIds: [],
+    });
+    const alreadyLeft = await request(app)
+      .delete(`${base}/me`)
+      .set("Authorization", `Bearer ${first.token}`);
+    expect(alreadyLeft.status).toBe(200);
   });
 
   it("preserves concurrent member changes when an admin applies a roster delta", async () => {
     const { owner, first, second, group, item } = await createContext("WAITING_PLAYERS", 3);
     const base = participantsPath(group.id, item.id);
-    await request(app).patch(`/api/v1/groups/${group.id}/queue/${item.id}/self-enrollment`).set("Authorization", `Bearer ${owner.token}`).send({ enabled: true });
+    await setSelfEnrollment(owner, group, item);
     const [joined, edited] = await Promise.all([
       request(app).post(`${base}/me`).set("Authorization", `Bearer ${first.token}`).send({}),
-      request(app).patch(base).set("Authorization", `Bearer ${owner.token}`).send({ addIds: [second.user.id], removeIds: [] }),
+      request(app)
+        .patch(base)
+        .set("Authorization", `Bearer ${owner.token}`)
+        .send({ addIds: [second.user.id], removeIds: [] }),
     ]);
     expect(joined.status).toBe(200);
     expect(edited.status).toBe(200);
-    expect(new Set((await QueueItem.findById(item.id)).participants.map(String))).toEqual(new Set([first.user.id, second.user.id]));
-    await request(app).post(readyPath(group.id, item.id)).set("Authorization", `Bearer ${first.token}`).send({});
-    await request(app).post(readyPath(group.id, item.id)).set("Authorization", `Bearer ${second.token}`).send({});
-    const removed = await request(app).patch(base).set("Authorization", `Bearer ${owner.token}`).send({ addIds: [], removeIds: [second.user.id] });
-    expect(removed.body.data).toMatchObject({ status: "READY", participantIds: [first.user.id], readyUserIds: [first.user.id] });
-    await request(app).patch(`/api/v1/groups/${group.id}/queue/${item.id}/self-enrollment`).set("Authorization", `Bearer ${owner.token}`).send({ enabled: false });
-    expect((await request(app).delete(`${base}/me`).set("Authorization", `Bearer ${first.token}`)).status).toBe(200);
+    expect(new Set((await QueueItem.findById(item.id)).participants.map(String))).toEqual(
+      new Set([first.user.id, second.user.id]),
+    );
+    await request(app)
+      .post(readyPath(group.id, item.id))
+      .set("Authorization", `Bearer ${first.token}`)
+      .send({});
+    await request(app)
+      .post(readyPath(group.id, item.id))
+      .set("Authorization", `Bearer ${second.token}`)
+      .send({});
+    const removed = await request(app)
+      .patch(base)
+      .set("Authorization", `Bearer ${owner.token}`)
+      .send({ addIds: [], removeIds: [second.user.id] });
+    expect(removed.body.data).toMatchObject({
+      status: "READY",
+      participantIds: [first.user.id],
+      readyUserIds: [first.user.id],
+    });
+    await setSelfEnrollment(owner, group, item, false);
+    const left = await request(app)
+      .delete(`${base}/me`)
+      .set("Authorization", `Bearer ${first.token}`);
+    expect(left.status).toBe(200);
   });
 
   it("does not overbook when two members join the last available place", async () => {
     const { owner, first, second, group, item } = await createContext("WAITING_PLAYERS", 1);
-    await request(app).patch(`/api/v1/groups/${group.id}/queue/${item.id}/self-enrollment`).set("Authorization", `Bearer ${owner.token}`).send({ enabled: true });
+    await setSelfEnrollment(owner, group, item);
     const path = `${participantsPath(group.id, item.id)}/me`;
     const responses = await Promise.all([
       request(app).post(path).set("Authorization", `Bearer ${first.token}`).send({}),
@@ -374,25 +433,58 @@ integration("queue participants and readiness integration", () => {
     item.participants = [first.user._id];
     item.readyUsers = [first.user._id];
     await item.save();
-    await request(app).patch(`/api/v1/groups/${group.id}/queue/${item.id}/self-enrollment`).set("Authorization", `Bearer ${owner.token}`).send({ enabled: true });
-    const joined = await request(app).post(`${participantsPath(group.id, item.id)}/me`).set("Authorization", `Bearer ${second.token}`).send({});
-    expect(joined.body.data).toMatchObject({ status: "WAITING_PLAYERS", readyUserIds: [first.user.id] });
+    await setSelfEnrollment(owner, group, item);
+    const joined = await request(app)
+      .post(`${participantsPath(group.id, item.id)}/me`)
+      .set("Authorization", `Bearer ${second.token}`)
+      .send({});
+    expect(joined.body.data).toMatchObject({
+      status: "WAITING_PLAYERS",
+      readyUserIds: [first.user.id],
+    });
     const startPath = `/api/v1/groups/${group.id}/queue/${item.id}/status`;
-    expect((await request(app).patch(startPath).set("Authorization", `Bearer ${owner.token}`).send({ status: "PLAYING" })).status).not.toBe(200);
-    await request(app).post(readyPath(group.id, item.id)).set("Authorization", `Bearer ${second.token}`).send({});
-    expect((await request(app).patch(startPath).set("Authorization", `Bearer ${owner.token}`).send({ status: "PLAYING" })).status).toBe(200);
-    expect((await request(app).delete(`${participantsPath(group.id, item.id)}/me`).set("Authorization", `Bearer ${second.token}`)).status).toBe(409);
+    const prematureStart = await request(app)
+      .patch(startPath)
+      .set("Authorization", `Bearer ${owner.token}`)
+      .send({ status: "PLAYING" });
+    expect(prematureStart.status).not.toBe(200);
+    await request(app)
+      .post(readyPath(group.id, item.id))
+      .set("Authorization", `Bearer ${second.token}`)
+      .send({});
+    const started = await request(app)
+      .patch(startPath)
+      .set("Authorization", `Bearer ${owner.token}`)
+      .send({ status: "PLAYING" });
+    expect(started.status).toBe(200);
+
+    const lateExit = await request(app)
+      .delete(`${participantsPath(group.id, item.id)}/me`)
+      .set("Authorization", `Bearer ${second.token}`);
+    expect(lateExit.status).toBe(409);
   });
 
   it("rejects invalid or excessive administrative additions without changing the roster", async () => {
     const { owner, first, second, group, item } = await createContext("WAITING_PLAYERS", 1);
     const path = participantsPath(group.id, item.id);
-    await request(app).patch(path).set("Authorization", `Bearer ${owner.token}`).send({ addIds: [first.user.id], removeIds: [] });
-    const full = await request(app).patch(path).set("Authorization", `Bearer ${owner.token}`).send({ addIds: [second.user.id], removeIds: [] });
+    await request(app)
+      .patch(path)
+      .set("Authorization", `Bearer ${owner.token}`)
+      .send({ addIds: [first.user.id], removeIds: [] });
+    const full = await request(app)
+      .patch(path)
+      .set("Authorization", `Bearer ${owner.token}`)
+      .send({ addIds: [second.user.id], removeIds: [] });
     expect(full.status).toBe(422);
     expect(full.body.error.code).toBe("MAX_PLAYERS_EXCEEDED");
-    await GroupMember.updateOne({ group: group.id, user: second.user.id }, { $set: { status: "REMOVED" } });
-    const removed = await request(app).patch(path).set("Authorization", `Bearer ${owner.token}`).send({ addIds: [second.user.id], removeIds: [] });
+    await GroupMember.updateOne(
+      { group: group.id, user: second.user.id },
+      { $set: { status: "REMOVED" } },
+    );
+    const removed = await request(app)
+      .patch(path)
+      .set("Authorization", `Bearer ${owner.token}`)
+      .send({ addIds: [second.user.id], removeIds: [] });
     expect(removed.status).toBe(422);
     expect(removed.body.error.code).toBe("INVALID_QUEUE_PARTICIPANTS");
     expect((await QueueItem.findById(item.id)).participants.map(String)).toEqual([first.user.id]);

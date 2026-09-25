@@ -3,10 +3,7 @@ import { z } from "zod";
 export const passwordSchema = z
   .string()
   .min(8, "Senha deve ser maior ou igual a 8 caracteres")
-  .refine(
-    (value) => Buffer.byteLength(value, "utf8") <= 72,
-    "Senha deve ter no maximo 72 bytes",
-  )
+  .refine((value) => Buffer.byteLength(value, "utf8") <= 72, "Senha deve ter no maximo 72 bytes")
   .regex(/[a-z]/, "Senha deve conter letra minuscula")
   .regex(/[A-Z]/, "Senha deve conter letra maiuscula")
   .regex(/\d/, "Senha deve conter numero");
@@ -27,9 +24,7 @@ export const registerSchema = base.extend({
         .max(80, "Nome deve ser menor ou igual a 80 caracteres"),
       email: z.string().trim().toLowerCase().email("Email invalido"),
       password: passwordSchema,
-      confirmPassword: z
-        .string()
-        .min(1, "Confirmacao da senha e obrigatoria."),
+      confirmPassword: z.string().min(1, "Confirmacao da senha e obrigatoria."),
     })
     .strict()
     .superRefine((data, ctx) => {

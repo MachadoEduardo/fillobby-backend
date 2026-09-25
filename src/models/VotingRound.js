@@ -22,7 +22,10 @@ const votingRoundSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-votingRoundSchema.index({ group: 1, status: 1 }, { unique: true, partialFilterExpression: { status: "OPEN" } });
+votingRoundSchema.index(
+  { group: 1, status: 1 },
+  { unique: true, partialFilterExpression: { status: "OPEN" } },
+);
 votingRoundSchema.index({ group: 1, createdAt: -1 });
 
 export default mongoose.model("VotingRound", votingRoundSchema);

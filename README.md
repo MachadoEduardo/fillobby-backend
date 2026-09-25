@@ -29,6 +29,8 @@ Isso inicia MongoDB, API (`http://localhost:3000`) e frontend (`http://localhost
 | Comando | Finalidade |
 | --- | --- |
 | `npm run lint` | Verifica o código com ESLint |
+| `npm run format` | Formata o JavaScript com Prettier após alterações |
+| `npm run format:check` | Confere a formatação sem modificar arquivos; também roda na CI |
 | `npm run lint:openapi` | Valida o contrato da API |
 | `npm test` | Executa testes unitários e de integração; estes exigem `TEST_MONGO_URI` |
 | `npm run test:ci` | Exige `TEST_MONGO_URI` e impede integrações ignoradas |

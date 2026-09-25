@@ -1,9 +1,7 @@
 import { z } from "zod";
 
 const objectId = (label) =>
-  z
-    .string({ error: `${label} e obrigatorio.` })
-    .regex(/^[a-f\d]{24}$/i, `${label} invalido.`);
+  z.string({ error: `${label} e obrigatorio.` }).regex(/^[a-f\d]{24}$/i, `${label} invalido.`);
 
 const params = z.object({
   groupId: objectId("Identificador do grupo"),

@@ -2,7 +2,12 @@ import { Router } from "express";
 import authMiddleware from "../../middlewares/auth.middleware.js";
 import { validate } from "../../middlewares/validation.middleware.js";
 import * as controller from "./voting-rounds.controller.js";
-import { cancelRoundSchema, closeRoundSchema, listRoundsSchema, startRoundSchema } from "./voting-rounds.validation.js";
+import {
+  cancelRoundSchema,
+  closeRoundSchema,
+  listRoundsSchema,
+  startRoundSchema,
+} from "./voting-rounds.validation.js";
 
 const router = Router({ mergeParams: true });
 router.use(authMiddleware);

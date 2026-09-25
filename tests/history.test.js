@@ -163,10 +163,7 @@ integration("history integration", () => {
     expect(response.body.data.historyItems[0]).toMatchObject({
       status: "COMPLETED",
       game: { title: context.secondGame.title },
-      participantIds: [
-        context.first.user._id.toString(),
-        context.second.user._id.toString(),
-      ],
+      participantIds: [context.first.user._id.toString(), context.second.user._id.toString()],
       participants: [
         {
           id: context.first.user._id.toString(),
@@ -185,9 +182,7 @@ integration("history integration", () => {
 
   it("requires authentication and an active group membership", async () => {
     const context = await createContext();
-    const unauthenticated = await request(app).get(
-      historyPath(context.group._id),
-    );
+    const unauthenticated = await request(app).get(historyPath(context.group._id));
     expect(unauthenticated.status).toBe(401);
 
     const outsider = await createUser("History Outsider");
@@ -256,18 +251,14 @@ integration("history integration", () => {
       completedAt: new Date("2026-03-02T12:00:00.000Z"),
     });
 
-    const query =
-      `?gameId=${context.firstGame._id}` +
-      `&participantId=${context.first.user._id}`;
+    const query = `?gameId=${context.firstGame._id}` + `&participantId=${context.first.user._id}`;
     const response = await request(app)
       .get(historyPath(context.group._id, query))
       .set("Authorization", `Bearer ${context.first.token}`);
 
     expect(response.status).toBe(200);
     expect(response.body.data.historyItems).toHaveLength(1);
-    expect(response.body.data.historyItems[0].id).toBe(
-      expected._id.toString(),
-    );
+    expect(response.body.data.historyItems[0].id).toBe(expected._id.toString());
   });
 
   it("filters an inclusive UTC date range and validates its order", async () => {
@@ -290,9 +281,7 @@ integration("history integration", () => {
       .set("Authorization", `Bearer ${context.first.token}`);
     expect(response.status).toBe(200);
     expect(response.body.data.historyItems).toHaveLength(1);
-    expect(response.body.data.historyItems[0].id).toBe(
-      expected._id.toString(),
-    );
+    expect(response.body.data.historyItems[0].id).toBe(expected._id.toString());
 
     const reversed = await request(app)
       .get(historyPath(context.group._id, "?from=2026-04-11&to=2026-04-10"))

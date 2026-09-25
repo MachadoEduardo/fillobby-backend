@@ -13,6 +13,8 @@
     "dev": "node --watch app.js",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
+    "format": "prettier --write \"**/*.{js,cjs,mjs}\"",
+    "format:check": "prettier --check \"**/*.{js,cjs,mjs}\"",
     "lint:openapi": "redocly lint docs/openapi.yaml",
     "test": "vitest run --no-file-parallelism",
     "test:ci": "node -e \"if (!process.env.TEST_MONGO_URI) throw new Error('TEST_MONGO_URI is required')\" && vitest run --no-file-parallelism",
@@ -39,6 +41,7 @@
     "ajv-formats": "^3.0.1",
     "eslint": "^10.11.0",
     "globals": "^17.12.0",
+    "prettier": "3.9.6",
     "supertest": "^7.2.2",
     "vitest": "^4.1.10",
     "yaml": "^2.9.1"

@@ -58,10 +58,7 @@ export const updateGroupSchema = z.object({
   body: z
     .object({ name: groupName.optional(), description })
     .strict()
-    .refine(
-      (value) => Object.keys(value).length > 0,
-      "Informe ao menos um campo para atualizar.",
-    ),
+    .refine((value) => Object.keys(value).length > 0, "Informe ao menos um campo para atualizar."),
   params: paramsWithGroup,
   query: emptyQuery,
 });

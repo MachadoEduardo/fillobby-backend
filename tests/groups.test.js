@@ -109,7 +109,9 @@ integration("groups integration", () => {
     expect(repeated.status).toBe(200);
     expect(repeated.body.data.id).toBe(created.body.data.id);
     expect(repeated.body.data.role).toBe("OWNER");
-    expect(await GroupMember.countDocuments({ group: created.body.data.id, user: owner.id })).toBe(1);
+    expect(await GroupMember.countDocuments({ group: created.body.data.id, user: owner.id })).toBe(
+      1,
+    );
   });
 
   it("enforces membership and role permissions", async () => {
@@ -146,9 +148,7 @@ integration("groups integration", () => {
       .set("Authorization", `Bearer ${owner.token}`)
       .send({ newOwnerId: member.id });
     expect(transferred.status).toBe(200);
-    expect((await Group.findById(created.body.data.id)).owner.toString()).toBe(
-      member.id,
-    );
+    expect((await Group.findById(created.body.data.id)).owner.toString()).toBe(member.id);
     const forbidden = await request(app)
       .patch(`/api/v1/groups/${created.body.data.id}/members/${owner.id}/role`)
       .set("Authorization", `Bearer ${owner.token}`)
@@ -339,9 +339,7 @@ integration("groups integration", () => {
       .set("Authorization", `Bearer ${owner.token}`);
 
     expect(removed.status).toBe(200);
-    expect(removed.body.data.members).toMatchObject([
-      { id: member.id, status: "REMOVED" },
-    ]);
+    expect(removed.body.data.members).toMatchObject([{ id: member.id, status: "REMOVED" }]);
   });
 
   it("allows administrators to renew the invite code", async () => {

@@ -6,11 +6,7 @@ function normalizeTitle(title) {
 }
 
 function duplicateGameError() {
-  return new AppError(
-    "GAME_ALREADY_EXISTS",
-    "Este jogo ja esta cadastrado.",
-    409,
-  );
+  return new AppError("GAME_ALREADY_EXISTS", "Este jogo ja esta cadastrado.", 409);
 }
 
 function serializeGame(game) {
@@ -40,11 +36,7 @@ async function findActiveGame(gameId) {
 
 function requireAuthor(game, userId) {
   if (game.createdBy.toString() !== userId.toString()) {
-    throw new AppError(
-      "GAME_AUTHOR_REQUIRED",
-      "Somente o autor pode alterar este jogo.",
-      403,
-    );
+    throw new AppError("GAME_AUTHOR_REQUIRED", "Somente o autor pode alterar este jogo.", 403);
   }
 }
 
@@ -67,8 +59,7 @@ export async function createGame({ userId, data }) {
     });
     return { game: serializeGame(game), reactivated: false };
   } catch (error) {
-    if (error?.code === 11000 && error.keyPattern?.normalizedTitle)
-      throw duplicateGameError();
+    if (error?.code === 11000 && error.keyPattern?.normalizedTitle) throw duplicateGameError();
     throw error;
   }
 }
@@ -102,8 +93,7 @@ export async function updateGame({ gameId, userId, changes }) {
 
   if (changes.title !== undefined) {
     const normalizedTitle = normalizeTitle(changes.title);
-    if (await Game.exists({ normalizedTitle, _id: { $ne: game._id } }))
-      throw duplicateGameError();
+    if (await Game.exists({ normalizedTitle, _id: { $ne: game._id } })) throw duplicateGameError();
     game.normalizedTitle = normalizedTitle;
   }
 
@@ -112,8 +102,7 @@ export async function updateGame({ gameId, userId, changes }) {
     await game.save();
     return serializeGame(game);
   } catch (error) {
-    if (error?.code === 11000 && error.keyPattern?.normalizedTitle)
-      throw duplicateGameError();
+    if (error?.code === 11000 && error.keyPattern?.normalizedTitle) throw duplicateGameError();
     throw error;
   }
 }

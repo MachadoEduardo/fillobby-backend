@@ -1,10 +1,10 @@
-import mongoose from 'mongoose';
+import mongoose from "mongoose";
 
 const userAvatarSchema = new mongoose.Schema(
   {
     user: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
+      ref: "User",
       required: true,
       unique: true,
     },
@@ -15,7 +15,7 @@ const userAvatarSchema = new mongoose.Schema(
     contentType: {
       type: String,
       required: true,
-      enum: ['image/jpeg', 'image/png', 'image/webp'],
+      enum: ["image/jpeg", "image/png", "image/webp"],
     },
     size: {
       type: Number,
@@ -27,6 +27,6 @@ const userAvatarSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-const UserAvatar = mongoose.model('UserAvatar', userAvatarSchema);
+const UserAvatar = mongoose.model("UserAvatar", userAvatarSchema);
 
 export default UserAvatar;

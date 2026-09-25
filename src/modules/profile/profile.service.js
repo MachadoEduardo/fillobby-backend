@@ -9,18 +9,11 @@ import AppError from "../../shared/errors/AppError.js";
 function detectContentType(data) {
   if (
     data.length >= 8 &&
-    data
-      .subarray(0, 8)
-      .equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))
+    data.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))
   )
     return "image/png";
 
-  if (
-    data.length >= 3 &&
-    data[0] === 0xff &&
-    data[1] === 0xd8 &&
-    data[2] === 0xff
-  )
+  if (data.length >= 3 && data[0] === 0xff && data[1] === 0xd8 && data[2] === 0xff)
     return "image/jpeg";
 
   if (
@@ -50,17 +43,11 @@ export async function changePassword({ user, currentPassword, newPassword }) {
   if (!currentUser || !currentUser.isActive)
     throw new AppError("USER_NOT_FOUND", "Usuario nao encontrado.", 404);
 
-  const isCurrentPasswordValid = await bcrypt.compare(
-    currentPassword,
-    currentUser.passwordHash,
-  );
+  const isCurrentPasswordValid = await bcrypt.compare(currentPassword, currentUser.passwordHash);
   if (!isCurrentPasswordValid)
-    throw new AppError(
-      "INVALID_CURRENT_PASSWORD",
-      "Senha atual incorreta.",
-      422,
-      [{ field: "body.currentPassword", message: "Senha atual incorreta." }],
-    );
+    throw new AppError("INVALID_CURRENT_PASSWORD", "Senha atual incorreta.", 422, [
+      { field: "body.currentPassword", message: "Senha atual incorreta." },
+    ]);
 
   if (await bcrypt.compare(newPassword, currentUser.passwordHash))
     throw new AppError(
@@ -82,19 +69,11 @@ export async function changePassword({ user, currentPassword, newPassword }) {
 
 export async function uploadAvatar({ user, data, contentType }) {
   if (!Buffer.isBuffer(data) || data.length === 0)
-    throw new AppError(
-      "AVATAR_REQUIRED",
-      "Selecione uma imagem para enviar.",
-      422,
-    );
+    throw new AppError("AVATAR_REQUIRED", "Selecione uma imagem para enviar.", 422);
 
   const detectedContentType = detectContentType(data);
   if (!detectedContentType || detectedContentType !== contentType)
-    throw new AppError(
-      "UNSUPPORTED_IMAGE_TYPE",
-      "Envie uma imagem JPEG, PNG ou WebP valida.",
-      415,
-    );
+    throw new AppError("UNSUPPORTED_IMAGE_TYPE", "Envie uma imagem JPEG, PNG ou WebP valida.", 415);
 
   await UserAvatar.findOneAndUpdate(
     { user: user._id },
@@ -118,8 +97,7 @@ export async function getAvatar(userId) {
     throw new AppError("AVATAR_NOT_FOUND", "Avatar nao encontrado.", 404);
 
   const avatar = await UserAvatar.findOne({ user: userId });
-  if (!avatar)
-    throw new AppError("AVATAR_NOT_FOUND", "Avatar nao encontrado.", 404);
+  if (!avatar) throw new AppError("AVATAR_NOT_FOUND", "Avatar nao encontrado.", 404);
 
   return avatar;
 }

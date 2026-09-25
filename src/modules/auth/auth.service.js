@@ -16,8 +16,7 @@ export function serializeUser(user) {
 
 export async function register({ name, email, password }) {
   const existing = await User.findOne({ email });
-  if (existing)
-    throw new AppError("EMAIL_ALREADY_EXISTS", "Email ja cadastrado.", 409);
+  if (existing) throw new AppError("EMAIL_ALREADY_EXISTS", "Email ja cadastrado.", 409);
 
   const passwordHash = await bcrypt.hash(password, env.bcryptRounds);
   try {
@@ -32,7 +31,7 @@ export async function register({ name, email, password }) {
 
 export async function login({ email, password }) {
   const user = await User.findOne({ email }).select("+passwordHash");
-  if ( !user || !user.isActive || !(await bcrypt.compare(password, user.passwordHash)))
+  if (!user || !user.isActive || !(await bcrypt.compare(password, user.passwordHash)))
     throw new AppError("INVALID_CREDENTIALS", "Email ou senha invalidos.", 401);
 
   const token = jwt.sign({}, env.jwtSecret, {

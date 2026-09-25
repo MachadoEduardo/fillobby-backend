@@ -234,3 +234,4 @@ Não afirme que uma mudança está concluída sem executar os testes e verifica�
 - Não foram adicionadas dependências ou abstrações sem justificativa.
 - Testes relevantes passam, ou a ausência de infraestrutura de teste é registrada.
 - README e `.env.example` são atualizados quando instalação, configuração ou API pública mudarem.
+- Após editar JavaScript, execute `npm run format`; antes de concluir, execute `npm run format:check` e `npm run lint`. A formatação automática não substitui a revisão de legibilidade.

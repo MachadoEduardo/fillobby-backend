@@ -48,10 +48,7 @@ integration("games integration", () => {
       .send({ title: "It Takes Two", platforms: ["PC"] });
     expect(unauthenticated.status).toBe(401);
 
-    const { user, token } = await createAuthenticatedUser(
-      "Game Author",
-      "author@example.com",
-    );
+    const { user, token } = await createAuthenticatedUser("Game Author", "author@example.com");
     const invalid = await request(app)
       .post("/api/v1/games")
       .set("Authorization", `Bearer ${token}`)
@@ -67,10 +64,7 @@ integration("games integration", () => {
   });
 
   it("creates a game using the authenticated user as author", async () => {
-    const { user, token } = await createAuthenticatedUser(
-      "Game Author",
-      "author@example.com",
-    );
+    const { user, token } = await createAuthenticatedUser("Game Author", "author@example.com");
     const response = await request(app)
       .post("/api/v1/games")
       .set("Authorization", `Bearer ${token}`)
@@ -101,10 +95,7 @@ integration("games integration", () => {
   });
 
   it("rejects duplicated normalized titles for active games", async () => {
-    const { token } = await createAuthenticatedUser(
-      "Game Author",
-      "author@example.com",
-    );
+    const { token } = await createAuthenticatedUser("Game Author", "author@example.com");
     const first = await request(app)
       .post("/api/v1/games")
       .set("Authorization", `Bearer ${token}`)
@@ -120,10 +111,7 @@ integration("games integration", () => {
   });
 
   it("reactivates an inactive game instead of creating a duplicate", async () => {
-    const { user, token } = await createAuthenticatedUser(
-      "Game Author",
-      "author@example.com",
-    );
+    const { user, token } = await createAuthenticatedUser("Game Author", "author@example.com");
     const inactiveGame = await Game.create({
       title: "Portal 2",
       normalizedTitle: "portal 2",
@@ -167,10 +155,7 @@ integration("games integration", () => {
   });
 
   it("rejects updates that collide with another normalized title", async () => {
-    const { user, token } = await createAuthenticatedUser(
-      "Game Author",
-      "author@example.com",
-    );
+    const { user, token } = await createAuthenticatedUser("Game Author", "author@example.com");
     const first = await Game.create({
       title: "Portal 2",
       normalizedTitle: "portal 2",
@@ -194,10 +179,7 @@ integration("games integration", () => {
   });
 
   it("lists only active games with search, platform and pagination", async () => {
-    const { user, token } = await createAuthenticatedUser(
-      "Game Author",
-      "author@example.com",
-    );
+    const { user, token } = await createAuthenticatedUser("Game Author", "author@example.com");
     await Game.create([
       {
         title: "Portal 2",
@@ -240,10 +222,7 @@ integration("games integration", () => {
   });
 
   it("returns details only for active games and validates ids", async () => {
-    const { user, token } = await createAuthenticatedUser(
-      "Game Author",
-      "author@example.com",
-    );
+    const { user, token } = await createAuthenticatedUser("Game Author", "author@example.com");
     const game = await Game.create({
       title: "Portal 2",
       normalizedTitle: "portal 2",
@@ -263,14 +242,8 @@ integration("games integration", () => {
   });
 
   it("allows only the author to update a game", async () => {
-    const author = await createAuthenticatedUser(
-      "Game Author",
-      "author@example.com",
-    );
-    const other = await createAuthenticatedUser(
-      "Other User",
-      "other@example.com",
-    );
+    const author = await createAuthenticatedUser("Game Author", "author@example.com");
+    const other = await createAuthenticatedUser("Other User", "other@example.com");
     const game = await Game.create({
       title: "Portal 2",
       normalizedTitle: "portal 2",
@@ -295,10 +268,7 @@ integration("games integration", () => {
   });
 
   it("soft deletes a game without removing queue references", async () => {
-    const author = await createAuthenticatedUser(
-      "Game Author",
-      "author@example.com",
-    );
+    const author = await createAuthenticatedUser("Game Author", "author@example.com");
     const game = await Game.create({
       title: "Portal 2",
       normalizedTitle: "portal 2",
@@ -319,8 +289,6 @@ integration("games integration", () => {
       isActive: false,
     });
     expect((await Game.findById(game._id)).isActive).toBe(false);
-    expect(
-      await QueueItem.exists({ _id: queueItem._id, game: game._id }),
-    ).toBeTruthy();
+    expect(await QueueItem.exists({ _id: queueItem._id, game: game._id })).toBeTruthy();
   });
 });

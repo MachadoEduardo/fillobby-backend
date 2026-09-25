@@ -1,0 +1,7 @@
+node_modules/
+coverage/
+dist/
+.output/
+.vercel/
+test-results/
+playwright-report/

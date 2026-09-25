@@ -1,8 +1,5 @@
 import mongoose from "mongoose";
-import {
-  ACTIVE_QUEUE_STATUSES,
-  QUEUE_STATUS,
-} from "../modules/queue/queue.constants.js";
+import { ACTIVE_QUEUE_STATUSES, QUEUE_STATUS } from "../modules/queue/queue.constants.js";
 
 const queueItemSchema = new mongoose.Schema(
   {

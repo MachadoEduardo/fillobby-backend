@@ -5,10 +5,7 @@ import GroupMember from "../../models/GroupMember.js";
 import QueueItem from "../../models/QueueItem.js";
 import Vote from "../../models/Vote.js";
 import AppError from "../../shared/errors/AppError.js";
-import {
-  ACTIVE_QUEUE_STATUSES,
-  QUEUE_STATUS,
-} from "../queue/queue.constants.js";
+import { ACTIVE_QUEUE_STATUSES, QUEUE_STATUS } from "../queue/queue.constants.js";
 
 const PRE_PLAYING_STATUSES = [
   QUEUE_STATUS.SUGGESTED,
@@ -77,8 +74,7 @@ export async function getActiveGroupContext(groupId, userId) {
 
   const group = await Group.findOne({ _id: groupId, isActive: true });
 
-  if (!group)
-    throw new AppError("GROUP_NOT_FOUND", "Grupo nao encontrado.", 404);
+  if (!group) throw new AppError("GROUP_NOT_FOUND", "Grupo nao encontrado.", 404);
 
   const membership = await GroupMember.findOne({
     group: group._id,
@@ -86,8 +82,7 @@ export async function getActiveGroupContext(groupId, userId) {
     status: "ACTIVE",
   });
 
-  if (!membership)
-    throw new AppError("GROUP_NOT_FOUND", "Grupo nao encontrado.", 404);
+  if (!membership) throw new AppError("GROUP_NOT_FOUND", "Grupo nao encontrado.", 404);
 
   return { group, membership };
 }
@@ -122,10 +117,7 @@ async function deactivateMembership({ group, membership, userId, status, session
           status: {
             $cond: [
               {
-                $in: [
-                  "$status",
-                  [QUEUE_STATUS.WAITING_PLAYERS, QUEUE_STATUS.READY],
-                ],
+                $in: ["$status", [QUEUE_STATUS.WAITING_PLAYERS, QUEUE_STATUS.READY]],
               },
               {
                 $cond: [
@@ -164,10 +156,7 @@ async function deactivateMembership({ group, membership, userId, status, session
 
   if (!votes.length) return;
 
-  await Vote.deleteMany(
-    { _id: { $in: votes.map((vote) => vote._id) } },
-    { session },
-  );
+  await Vote.deleteMany({ _id: { $in: votes.map((vote) => vote._id) } }, { session });
   await QueueItem.bulkWrite(
     votes.map((vote) => ({
       updateOne: {
@@ -180,7 +169,7 @@ async function deactivateMembership({ group, membership, userId, status, session
 }
 
 export async function createGroup({ userId, name, description }) {
-  for (let attempt = 0; attempt < 3; attempt ++) {
+  for (let attempt = 0; attempt < 3; attempt++) {
     try {
       return await transaction(async (session) => {
         const group = await Group.create(
@@ -209,12 +198,7 @@ export async function createGroup({ userId, name, description }) {
         return serializeGroup(group[0], { role: "OWNER" }, true);
       });
     } catch (error) {
-      if (
-        error?.code !== 11000 ||
-        !error.keyPattern?.inviteCode ||
-        attempt === 2
-      )
-        throw error;
+      if (error?.code !== 11000 || !error.keyPattern?.inviteCode || attempt === 2) throw error;
     }
   }
   throw new Error("Nao foi possivel gerar convite");
@@ -232,19 +216,13 @@ export async function listGroups({ userId, page, limit }) {
     isActive: true,
   }).sort({ updatedAt: -1 });
 
-  const membershipMap = new Map(
-    memberships.map((item) => [id(item.group), item]),
-  );
+  const membershipMap = new Map(memberships.map((item) => [id(item.group), item]));
 
   const total = groups.length;
   const items = groups.slice((page - 1) * limit, page * limit).map((group) => {
     const member = membershipMap.get(id(group._id));
 
-    return serializeGroup(
-      group,
-      member,
-      ["OWNER", "ADMIN"].includes(member?.role),
-    );
+    return serializeGroup(group, member, ["OWNER", "ADMIN"].includes(member?.role));
   });
   return {
     groups: items,
@@ -255,11 +233,7 @@ export async function listGroups({ userId, page, limit }) {
 export async function getGroup({ groupId, userId }) {
   const { group, membership } = await getActiveGroupContext(groupId, userId);
 
-  return serializeGroup(
-    group,
-    membership,
-    ["OWNER", "ADMIN"].includes(membership.role),
-  );
+  return serializeGroup(group, membership, ["OWNER", "ADMIN"].includes(membership.role));
 }
 
 export async function updateGroup({ groupId, userId, changes }) {
@@ -268,11 +242,7 @@ export async function updateGroup({ groupId, userId, changes }) {
   Object.assign(group, changes);
   await group.save();
 
-  return serializeGroup(
-    group,
-    membership,
-    ["OWNER", "ADMIN"].includes(membership.role),
-  );
+  return serializeGroup(group, membership, ["OWNER", "ADMIN"].includes(membership.role));
 }
 
 export async function joinGroup({ userId, inviteCode: code }) {
@@ -281,8 +251,7 @@ export async function joinGroup({ userId, inviteCode: code }) {
     isActive: true,
   });
 
-  if (!group)
-    throw new AppError("INVITE_NOT_FOUND", "Convite nao encontrado.", 404);
+  if (!group) throw new AppError("INVITE_NOT_FOUND", "Convite nao encontrado.", 404);
 
   const existing = await GroupMember.findOne({
     group: group._id,
@@ -296,11 +265,7 @@ export async function joinGroup({ userId, inviteCode: code }) {
     };
 
   if (existing?.status === "REMOVED")
-    throw new AppError(
-      "MEMBERSHIP_REMOVED",
-      "Este usuario foi removido do grupo.",
-      403,
-    );
+    throw new AppError("MEMBERSHIP_REMOVED", "Este usuario foi removido do grupo.", 403);
 
   try {
     const membership = existing
@@ -325,11 +290,7 @@ export async function joinGroup({ userId, inviteCode: code }) {
           joined: false,
         };
       if (current?.status === "REMOVED")
-        throw new AppError(
-          "MEMBERSHIP_REMOVED",
-          "Este usuario foi removido do grupo.",
-          403,
-        );
+        throw new AppError("MEMBERSHIP_REMOVED", "Este usuario foi removido do grupo.", 403);
     }
     throw error;
   }
@@ -364,8 +325,7 @@ export async function changeRole({ groupId, userId, targetUserId, role }) {
     status: "ACTIVE",
   });
 
-  if (!target)
-    throw new AppError("GROUP_MEMBER_NOT_FOUND", "Membro nao encontrado.", 404);
+  if (!target) throw new AppError("GROUP_MEMBER_NOT_FOUND", "Membro nao encontrado.", 404);
 
   if (target.role === "OWNER")
     throw new AppError(
@@ -384,11 +344,7 @@ export async function removeMember({ groupId, userId, targetUserId }) {
   const { group, membership } = await getActiveGroupContext(groupId, userId);
   requireRole(membership, ["OWNER", "ADMIN"]);
   if (id(userId) === id(targetUserId))
-    throw new AppError(
-      "CANNOT_REMOVE_SELF",
-      "Nao e possivel remover a si mesmo.",
-      409,
-    );
+    throw new AppError("CANNOT_REMOVE_SELF", "Nao e possivel remover a si mesmo.", 409);
 
   const target = await GroupMember.findOne({
     group: group._id,
@@ -396,18 +352,10 @@ export async function removeMember({ groupId, userId, targetUserId }) {
     status: "ACTIVE",
   });
 
-  if (!target)
-    throw new AppError("GROUP_MEMBER_NOT_FOUND", "Membro nao encontrado.", 404);
+  if (!target) throw new AppError("GROUP_MEMBER_NOT_FOUND", "Membro nao encontrado.", 404);
 
-  if (
-    target.role === "OWNER" ||
-    (membership.role === "ADMIN" && target.role !== "MEMBER")
-  )
-    throw new AppError(
-      "INSUFFICIENT_GROUP_ROLE",
-      "Voce nao pode remover este membro.",
-      403,
-    );
+  if (target.role === "OWNER" || (membership.role === "ADMIN" && target.role !== "MEMBER"))
+    throw new AppError("INSUFFICIENT_GROUP_ROLE", "Voce nao pode remover este membro.", 403);
 
   await transaction(async (session) => {
     await deactivateMembership({
@@ -475,11 +423,7 @@ export async function regenerateInviteCode({ groupId, userId }) {
       await group.save();
       return serializeGroup(group, membership, true);
     } catch (error) {
-      if (
-        error?.code !== 11000 ||
-        !error.keyPattern?.inviteCode ||
-        attempt === 2
-      ) {
+      if (error?.code !== 11000 || !error.keyPattern?.inviteCode || attempt === 2) {
         throw error;
       }
     }
@@ -492,11 +436,7 @@ export async function transferOwner({ groupId, userId, newOwnerId }) {
   const { group, membership } = await getActiveGroupContext(groupId, userId);
   requireRole(membership, ["OWNER"]);
   if (id(userId) === id(newOwnerId))
-    throw new AppError(
-      "INVALID_OWNER_TRANSFER",
-      "O novo dono deve ser outro membro.",
-      422,
-    );
+    throw new AppError("INVALID_OWNER_TRANSFER", "O novo dono deve ser outro membro.", 422);
 
   return transaction(async (session) => {
     const target = await GroupMember.findOne({
@@ -505,24 +445,11 @@ export async function transferOwner({ groupId, userId, newOwnerId }) {
       status: "ACTIVE",
     }).session(session);
 
-    if (!target)
-      throw new AppError(
-        "GROUP_MEMBER_NOT_FOUND",
-        "Membro nao encontrado.",
-        404,
-      );
+    if (!target) throw new AppError("GROUP_MEMBER_NOT_FOUND", "Membro nao encontrado.", 404);
 
-    await GroupMember.updateOne(
-      { _id: membership._id },
-      { $set: { role: "ADMIN" } },
-      { session },
-    );
+    await GroupMember.updateOne({ _id: membership._id }, { $set: { role: "ADMIN" } }, { session });
 
-    await GroupMember.updateOne(
-      { _id: target._id },
-      { $set: { role: "OWNER" } },
-      { session },
-    );
+    await GroupMember.updateOne({ _id: target._id }, { $set: { role: "OWNER" } }, { session });
 
     group.owner = newOwnerId;
     await group.save({ session });
@@ -535,12 +462,8 @@ export async function deleteGroup({ groupId, userId }) {
   const { group, membership } = await getActiveGroupContext(groupId, userId);
   requireRole(membership, ["OWNER"]);
   await transaction(async (session) => {
-    await Group.updateOne(
-      { _id: group._id },
-      { $set: { isActive: false } },
-      { session },
-    );
-    
+    await Group.updateOne({ _id: group._id }, { $set: { isActive: false } }, { session });
+
     await GroupMember.updateMany(
       { group: group._id, status: "ACTIVE" },
       { $set: { status: "INACTIVE" } },

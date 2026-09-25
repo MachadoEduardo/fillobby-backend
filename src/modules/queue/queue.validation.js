@@ -4,10 +4,8 @@ import { ACTIVE_QUEUE_STATUSES, QUEUE_STATUS } from "./queue.constants.js";
 const PLATFORMS = ["PC", "PlayStation", "Xbox", "Switch"];
 const SORTS = ["votes_desc", "created_asc", "updated_desc"];
 const objectId = (label) =>
-  z
-    .string({ error: `${label} e obrigatorio.` })
-    .regex(/^[a-f\d]{24}$/i, `${label} invalido.`);
-    
+  z.string({ error: `${label} e obrigatorio.` }).regex(/^[a-f\d]{24}$/i, `${label} invalido.`);
+
 const groupParams = z.object({ groupId: objectId("Identificador do grupo") });
 const itemParams = groupParams.extend({
   itemId: objectId("Identificador do item"),
@@ -25,8 +23,7 @@ const statusFilter = z
   )
   .refine(
     (values) =>
-      values.length > 0 &&
-      values.every((status) => ACTIVE_QUEUE_STATUSES.includes(status)),
+      values.length > 0 && values.every((status) => ACTIVE_QUEUE_STATUSES.includes(status)),
     "Status da fila invalido.",
   )
   .optional();
@@ -43,11 +40,7 @@ export const listQueueSchema = z.object({
   query: z
     .object({
       status: statusFilter,
-      search: z
-        .string()
-        .trim()
-        .max(120, "Busca deve ter no maximo 120 caracteres.")
-        .optional(),
+      search: z.string().trim().max(120, "Busca deve ter no maximo 120 caracteres.").optional(),
       platform: z.enum(PLATFORMS, { error: "Plataforma invalida." }).optional(),
       page: z.coerce
         .number({ error: "Pagina deve ser um numero." })
@@ -60,9 +53,7 @@ export const listQueueSchema = z.object({
         .min(1, "Limite deve ser maior ou igual a 1.")
         .max(100, "Limite nao pode ser maior que 100.")
         .default(20),
-      sort: z
-        .enum(SORTS, { error: "Ordenacao invalida." })
-        .default("votes_desc"),
+      sort: z.enum(SORTS, { error: "Ordenacao invalida." }).default("votes_desc"),
     })
     .strict()
     .default({}),
@@ -77,10 +68,9 @@ export const queueItemParamSchema = z.object({
 export const transitionQueueSchema = z.object({
   body: z
     .object({
-      status: z.enum(
-        [QUEUE_STATUS.VOTING, QUEUE_STATUS.PLAYING, QUEUE_STATUS.COMPLETED],
-        { error: "Status solicitado invalido." },
-      ),
+      status: z.enum([QUEUE_STATUS.VOTING, QUEUE_STATUS.PLAYING, QUEUE_STATUS.COMPLETED], {
+        error: "Status solicitado invalido.",
+      }),
     })
     .strict(),
   params: itemParams,
@@ -120,14 +110,17 @@ export const selfEnrollmentSchema = z.object({
 });
 
 export const adjustParticipantsSchema = z.object({
-  body: z.object({
-    addIds: z.array(objectId("Identificador do participante")),
-    removeIds: z.array(objectId("Identificador do participante")),
-  }).strict().superRefine((value, context) => {
-    const ids = [...value.addIds, ...value.removeIds];
-    if (new Set(ids.map((id) => id.toLowerCase())).size !== ids.length)
-      context.addIssue({ code: "custom", message: "Nao repita participantes." });
-  }),
+  body: z
+    .object({
+      addIds: z.array(objectId("Identificador do participante")),
+      removeIds: z.array(objectId("Identificador do participante")),
+    })
+    .strict()
+    .superRefine((value, context) => {
+      const ids = [...value.addIds, ...value.removeIds];
+      if (new Set(ids.map((id) => id.toLowerCase())).size !== ids.length)
+        context.addIssue({ code: "custom", message: "Nao repita participantes." });
+    }),
   params: itemParams,
   query: emptyQuery,
 });

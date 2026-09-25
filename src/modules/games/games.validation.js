@@ -61,11 +61,7 @@ export const listGamesSchema = z.object({
   params: emptyParams,
   query: z
     .object({
-      search: z
-        .string()
-        .trim()
-        .max(120, "Busca deve ter no maximo 120 caracteres.")
-        .optional(),
+      search: z.string().trim().max(120, "Busca deve ter no maximo 120 caracteres.").optional(),
       platform: z.enum(PLATFORMS, { error: "Plataforma invalida." }).optional(),
       page: z.coerce
         .number({ error: "Pagina deve ser um numero." })
@@ -99,10 +95,7 @@ export const updateGameSchema = z.object({
       description: description.optional(),
     })
     .strict()
-    .refine(
-      (value) => Object.keys(value).length > 0,
-      "Informe ao menos um campo para atualizar.",
-    ),
+    .refine((value) => Object.keys(value).length > 0, "Informe ao menos um campo para atualizar."),
   params: z.object({ gameId: objectId }),
   query: emptyQuery,
 });

@@ -20,8 +20,7 @@ const gameSchema = new mongoose.Schema(
       required: [true, "Plataformas sao obrigatorias"],
       enum: ["PC", "PlayStation", "Xbox", "Switch"],
       validate: {
-        validator: (values) =>
-          values.length > 0 && new Set(values).size === values.length,
+        validator: (values) => values.length > 0 && new Set(values).size === values.length,
         message: "Informe plataformas sem duplicatas",
       },
     },

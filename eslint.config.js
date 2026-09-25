@@ -1,32 +1,32 @@
-import js from '@eslint/js';
-import { defineConfig } from 'eslint/config';
-import globals from 'globals';
+import js from "@eslint/js";
+import { defineConfig } from "eslint/config";
+import globals from "globals";
 
 export default defineConfig([
   {
-    ignores: ['node_modules/**', 'coverage/**'],
+    ignores: ["node_modules/**", "coverage/**"],
   },
   js.configs.recommended,
   {
-    files: ['**/*.js'],
+    files: ["**/*.js"],
     languageOptions: {
-      ecmaVersion: 'latest',
-      sourceType: 'module',
+      ecmaVersion: "latest",
+      sourceType: "module",
       globals: globals.nodeBuiltin,
     },
     rules: {
-      eqeqeq: ['error', 'always'],
-      'no-duplicate-imports': 'error',
-      'no-unused-vars': [
-        'error',
+      eqeqeq: ["error", "always"],
+      "no-duplicate-imports": "error",
+      "no-unused-vars": [
+        "error",
         {
-          args: 'none',
-          caughtErrors: 'none',
+          args: "none",
+          caughtErrors: "none",
           ignoreRestSiblings: true,
         },
       ],
-      'no-var': 'error',
-      'prefer-const': 'error',
+      "no-var": "error",
+      "prefer-const": "error",
     },
   },
 ]);

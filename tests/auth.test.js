@@ -31,22 +31,18 @@ describe("auth contract", () => {
   });
 
   it("returns validation errors before accessing the database", async () => {
-    const response = await request(app)
-      .post("/api/v1/auth/register")
-      .send({ email: "invalido" });
+    const response = await request(app).post("/api/v1/auth/register").send({ email: "invalido" });
     expect(response.status).toBe(422);
     expect(response.body.error.code).toBe("VALIDATION_ERROR");
   });
 
   it("rejects registration when the password confirmation does not match", async () => {
-    const response = await request(app)
-      .post("/api/v1/auth/register")
-      .send({
-        name: "Ana Silva",
-        email: "ana@email.com",
-        password: "SenhaForte123",
-        confirmPassword: "SenhaDiferente123",
-      });
+    const response = await request(app).post("/api/v1/auth/register").send({
+      name: "Ana Silva",
+      email: "ana@email.com",
+      password: "SenhaForte123",
+      confirmPassword: "SenhaDiferente123",
+    });
 
     expect(response.status).toBe(422);
     expect(response.body.error).toMatchObject({
@@ -81,14 +77,12 @@ integration("auth integration", () => {
   });
 
   it("registers and logs in a user, then reads /me", async () => {
-    const registration = await request(app)
-      .post("/api/v1/auth/register")
-      .send({
-        name: "Ana Silva",
-        email: "ANA@EMAIL.COM",
-        password: "SenhaForte123",
-        confirmPassword: "SenhaForte123",
-      });
+    const registration = await request(app).post("/api/v1/auth/register").send({
+      name: "Ana Silva",
+      email: "ANA@EMAIL.COM",
+      password: "SenhaForte123",
+      confirmPassword: "SenhaForte123",
+    });
     expect(registration.status).toBe(201);
     expect(registration.body.data.user).toBeUndefined();
     expect(registration.body.data.email).toBe("ana@email.com");
@@ -115,9 +109,7 @@ integration("auth integration", () => {
       confirmPassword: "SenhaForte123",
     };
     await request(app).post("/api/v1/auth/register").send(payload);
-    const duplicate = await request(app)
-      .post("/api/v1/auth/register")
-      .send(payload);
+    const duplicate = await request(app).post("/api/v1/auth/register").send(payload);
     expect(duplicate.status).toBe(409);
     expect(duplicate.body.error.code).toBe("EMAIL_ALREADY_EXISTS");
 

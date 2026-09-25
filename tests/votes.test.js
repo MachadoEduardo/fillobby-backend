@@ -110,9 +110,7 @@ integration("votes integration", () => {
 
   it("requires authentication and rejects client-controlled identity", async () => {
     const { member, group, item } = await createContext();
-    const unauthenticated = await request(app)
-      .post(votesPath(group._id, item._id))
-      .send({});
+    const unauthenticated = await request(app).post(votesPath(group._id, item._id)).send({});
     expect(unauthenticated.status).toBe(401);
 
     const controlled = await request(app)
@@ -159,9 +157,7 @@ integration("votes integration", () => {
       .send({});
     expect(duplicate.status).toBe(409);
     expect(duplicate.body.error.code).toBe("VOTE_ALREADY_EXISTS");
-    expect(
-      await Vote.countDocuments({ queueItem: item._id, user: member.user._id }),
-    ).toBe(1);
+    expect(await Vote.countDocuments({ queueItem: item._id, user: member.user._id })).toBe(1);
     expect((await QueueItem.findById(item._id)).voteCount).toBe(1);
   });
 
@@ -245,12 +241,8 @@ integration("votes integration", () => {
       queueItemId: item._id.toString(),
       voteCount: 1,
     });
-    expect(
-      await Vote.exists({ queueItem: item._id, user: member.user._id }),
-    ).toBeFalsy();
-    expect(
-      await Vote.exists({ queueItem: item._id, user: owner.user._id }),
-    ).toBeTruthy();
+    expect(await Vote.exists({ queueItem: item._id, user: member.user._id })).toBeFalsy();
+    expect(await Vote.exists({ queueItem: item._id, user: owner.user._id })).toBeTruthy();
   });
 
   it("returns VOTE_NOT_FOUND without changing the counter", async () => {
