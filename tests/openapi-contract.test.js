@@ -134,6 +134,20 @@ integration("OpenAPI central flow contract", () => {
       .set("Authorization", authorization).send({});
     expect(closed.status).toBe(200);
     assertResponse("post", closePath, closed);
+    const selfEnrollmentPath = "/api/v1/groups/{groupId}/queue/{itemId}/self-enrollment";
+    const enabled = await request(app).patch(`/api/v1/groups/${groupId}/queue/${itemId}/self-enrollment`)
+      .set("Authorization", authorization).send({ enabled: true });
+    assertResponse("patch", selfEnrollmentPath, enabled);
+    const ownPath = "/api/v1/groups/{groupId}/queue/{itemId}/participants/me";
+    const joined = await request(app).post(`/api/v1/groups/${groupId}/queue/${itemId}/participants/me`)
+      .set("Authorization", authorization).send({});
+    assertResponse("post", ownPath, joined);
+    const adjusted = await request(app).patch(`/api/v1/groups/${groupId}/queue/${itemId}/participants`)
+      .set("Authorization", authorization).send({ addIds: [], removeIds: [] });
+    assertResponse("patch", "/api/v1/groups/{groupId}/queue/{itemId}/participants", adjusted);
+    const left = await request(app).delete(`/api/v1/groups/${groupId}/queue/${itemId}/participants/me`)
+      .set("Authorization", authorization);
+    assertResponse("delete", ownPath, left);
     const rounds = await request(app).get(`/api/v1/groups/${groupId}/voting-rounds`)
       .set("Authorization", authorization);
     assertResponse("get", roundsPath, rounds);

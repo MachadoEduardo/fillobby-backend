@@ -139,6 +139,8 @@ Permitir autoinscrição quando habilitada, saída voluntária antes da partida,
 - **Impacto:** participantes, prontidão e notificações.
 - **Tipo:** funcional.
 
+**Parcialmente concluído:** administrador pode habilitar autoinscrição por item após a votação; membros ativos entram até a capacidade do jogo e podem sair antes de `PLAYING`, inclusive quando incluídos manualmente. A seleção administrativa continua disponível sem sobrescrever alterações simultâneas, e a prontidão é recalculada atomicamente. Mínimo de jogadores e lista de espera permanecem pendentes para quando houver regras de sessão e demanda real.
+
 ### 10. Navegação e sincronização mais claras — P1
 
 Persistir aba, filtros e paginação na URL, mostrar quando os dados foram atualizados e reduzir polling conforme aba e visibilidade. Manter atualização manual e dados anteriores quando houver falha.

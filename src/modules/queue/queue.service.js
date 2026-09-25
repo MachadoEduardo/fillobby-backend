@@ -74,6 +74,54 @@ function readinessNotEditableError() {
   );
 }
 
+const participationStatuses = [QUEUE_STATUS.WAITING_PLAYERS, QUEUE_STATUS.READY];
+
+function participationUpdate(addIds, removeIds) {
+  const participants = {
+    $setUnion: [{ $setDifference: ["$participants", removeIds] }, addIds],
+  };
+  return [
+    {
+      $set: {
+        participants,
+        readyUsers: { $setDifference: ["$readyUsers", removeIds] },
+      },
+    },
+    {
+      $set: {
+        status: {
+          $cond: [
+            {
+              $and: [
+                { $gt: [{ $size: "$participants" }, 0] },
+                { $setEquals: ["$participants", "$readyUsers"] },
+              ],
+            },
+            QUEUE_STATUS.READY,
+            QUEUE_STATUS.WAITING_PLAYERS,
+          ],
+        },
+      },
+    },
+  ];
+}
+
+function capacityFilter(addIds, removeIds, maxPlayers) {
+  if (maxPlayers === null || maxPlayers === undefined) return {};
+  return {
+    $expr: {
+      $lte: [
+        {
+          $size: {
+            $setUnion: [{ $setDifference: ["$participants", removeIds] }, addIds],
+          },
+        },
+        maxPlayers,
+      ],
+    },
+  };
+}
+
 async function findQueueItem(groupId, itemId, activeOnly = true) {
   const filter = { _id: itemId, group: groupId };
   if (activeOnly) filter.status = { $in: ACTIVE_QUEUE_STATUSES };
@@ -204,6 +252,17 @@ export async function transitionQueueItem({
   if (targetStatus === QUEUE_STATUS.VOTING && await VotingRound.exists({ group: group._id, status: "OPEN" }))
     throw new AppError("VOTING_ROUND_ALREADY_OPEN", "Ja existe uma votacao aberta.", 409);
 
+  if (targetStatus === QUEUE_STATUS.PLAYING) {
+    const started = await QueueItem.findOneAndUpdate(
+      { _id: item._id, group: group._id, status: QUEUE_STATUS.READY },
+      { $set: { status: QUEUE_STATUS.PLAYING } },
+      { returnDocument: "after" },
+    );
+    if (!started)
+      throw new AppError("INVALID_QUEUE_TRANSITION", "A prontidao mudou. Atualize a fila.", 409);
+    return serializeItemForViewer(started, userId);
+  }
+
   item.status = targetStatus;
   item.completedAt =
     targetStatus === QUEUE_STATUS.COMPLETED ? new Date() : null;
@@ -227,6 +286,8 @@ export async function selectQueueParticipants({
   }
   if (item.status === QUEUE_STATUS.VOTING && item.votingRound)
     throw participantsNotEditableError();
+  if (item.selfEnrollmentEnabled)
+    throw new AppError("QUEUE_SELF_ENROLLMENT_ACTIVE", "Use a edicao individual de participantes enquanto a autoinscricao estiver ativa.", 409);
 
   const game = await Game.findById(item.game).select("maxPlayers");
   if (
@@ -262,6 +323,7 @@ export async function selectQueueParticipants({
       _id: item._id,
       group: group._id,
       status: { $in: editableStatuses },
+      selfEnrollmentEnabled: { $ne: true },
       $or: [{ status: QUEUE_STATUS.WAITING_PLAYERS }, { votingRound: null }],
     },
     [
@@ -294,6 +356,81 @@ export async function selectQueueParticipants({
 
   if (!updatedItem) throw participantsNotEditableError();
   return serializeItemForViewer(updatedItem, userId);
+}
+
+export async function setQueueSelfEnrollment({ groupId, userId, itemId, enabled }) {
+  const { group, membership } = await getActiveGroupContext(groupId, userId);
+  requireAdmin(membership);
+  const item = await findQueueItem(group._id, itemId, false);
+  if (!participationStatuses.includes(item.status)) throw participantsNotEditableError();
+  const updated = await QueueItem.findOneAndUpdate(
+    { _id: item._id, group: group._id, status: { $in: participationStatuses } },
+    { $set: { selfEnrollmentEnabled: enabled } },
+    { returnDocument: "after" },
+  );
+  if (!updated) throw participantsNotEditableError();
+  return serializeItemForViewer(updated, userId);
+}
+
+export async function adjustQueueParticipants({ groupId, userId, itemId, addIds, removeIds }) {
+  const { group, membership } = await getActiveGroupContext(groupId, userId);
+  requireAdmin(membership);
+  const item = await findQueueItem(group._id, itemId, false);
+  if (!participationStatuses.includes(item.status)) throw participantsNotEditableError();
+  const activeCount = await GroupMember.countDocuments({
+    group: group._id, user: { $in: addIds }, status: "ACTIVE",
+  });
+  if (activeCount !== addIds.length)
+    throw new AppError("INVALID_QUEUE_PARTICIPANTS", "Todos os participantes devem ser membros ativos do grupo.", 422);
+  const game = await Game.findById(item.game).select("maxPlayers");
+  const additions = addIds.map((value) => new mongoose.Types.ObjectId(value));
+  const removals = removeIds.map((value) => new mongoose.Types.ObjectId(value));
+  const updated = await QueueItem.findOneAndUpdate(
+    {
+      _id: item._id,
+      group: group._id,
+      status: { $in: participationStatuses },
+      ...capacityFilter(additions, removals, game?.maxPlayers),
+    },
+    participationUpdate(additions, removals),
+    { returnDocument: "after", updatePipeline: true },
+  );
+  if (!updated) {
+    const current = await findQueueItem(group._id, itemId, false);
+    if (!participationStatuses.includes(current.status)) throw participantsNotEditableError();
+    throw new AppError("MAX_PLAYERS_EXCEEDED", "Nao ha vagas suficientes neste jogo.", 422);
+  }
+  return serializeItemForViewer(updated, userId);
+}
+
+export async function changeOwnQueueParticipation({ groupId, userId, itemId, join }) {
+  const { group } = await getActiveGroupContext(groupId, userId);
+  const item = await findQueueItem(group._id, itemId, false);
+  if (!participationStatuses.includes(item.status)) throw participantsNotEditableError();
+  if (join && !item.selfEnrollmentEnabled)
+    throw new AppError("QUEUE_SELF_ENROLLMENT_DISABLED", "A inscricao neste jogo nao esta aberta.", 409);
+  const userObjectId = new mongoose.Types.ObjectId(id(userId));
+  const game = join ? await Game.findById(item.game).select("maxPlayers") : null;
+  const additions = join ? [userObjectId] : [];
+  const removals = join ? [] : [userObjectId];
+  const updated = await QueueItem.findOneAndUpdate(
+    {
+      _id: item._id,
+      group: group._id,
+      status: { $in: participationStatuses },
+      ...(join ? { selfEnrollmentEnabled: true, ...capacityFilter(additions, removals, game?.maxPlayers) } : {}),
+    },
+    participationUpdate(additions, removals),
+    { returnDocument: "after", updatePipeline: true },
+  );
+  if (!updated) {
+    const current = await findQueueItem(group._id, itemId, false);
+    if (!participationStatuses.includes(current.status)) throw participantsNotEditableError();
+    if (join && !current.selfEnrollmentEnabled)
+      throw new AppError("QUEUE_SELF_ENROLLMENT_DISABLED", "A inscricao neste jogo nao esta aberta.", 409);
+    throw new AppError("QUEUE_CAPACITY_REACHED", "Este jogo ja atingiu o limite de participantes.", 409);
+  }
+  return serializeItemForViewer(updated, userId);
 }
 
 export async function setQueueReadiness({ groupId, userId, itemId, isReady }) {

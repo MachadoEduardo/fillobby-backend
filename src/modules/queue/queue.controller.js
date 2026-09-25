@@ -67,6 +67,56 @@ export async function selectParticipants(req, res, next) {
   }
 }
 
+export async function adjustParticipants(req, res, next) {
+  try {
+    const data = await queueService.adjustQueueParticipants({
+      groupId: req.validated.params.groupId,
+      userId: req.user._id,
+      itemId: req.validated.params.itemId,
+      ...req.validated.body,
+    });
+    return res.status(200).json({ success: true, data });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+export async function setSelfEnrollment(req, res, next) {
+  try {
+    const data = await queueService.setQueueSelfEnrollment({
+      groupId: req.validated.params.groupId,
+      userId: req.user._id,
+      itemId: req.validated.params.itemId,
+      enabled: req.validated.body.enabled,
+    });
+    return res.status(200).json({ success: true, data });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+async function changeOwnParticipation(req, res, next, join) {
+  try {
+    const data = await queueService.changeOwnQueueParticipation({
+      groupId: req.validated.params.groupId,
+      userId: req.user._id,
+      itemId: req.validated.params.itemId,
+      join,
+    });
+    return res.status(200).json({ success: true, data });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+export function joinParticipants(req, res, next) {
+  return changeOwnParticipation(req, res, next, true);
+}
+
+export function leaveParticipants(req, res, next) {
+  return changeOwnParticipation(req, res, next, false);
+}
+
 export async function markReady(req, res, next) {
   try {
     const data = await queueService.setQueueReadiness({

@@ -112,3 +112,22 @@ export const readinessSchema = z.object({
   params: itemParams,
   query: emptyQuery,
 });
+
+export const selfEnrollmentSchema = z.object({
+  body: z.object({ enabled: z.boolean() }).strict(),
+  params: itemParams,
+  query: emptyQuery,
+});
+
+export const adjustParticipantsSchema = z.object({
+  body: z.object({
+    addIds: z.array(objectId("Identificador do participante")),
+    removeIds: z.array(objectId("Identificador do participante")),
+  }).strict().superRefine((value, context) => {
+    const ids = [...value.addIds, ...value.removeIds];
+    if (new Set(ids.map((id) => id.toLowerCase())).size !== ids.length)
+      context.addIssue({ code: "custom", message: "Nao repita participantes." });
+  }),
+  params: itemParams,
+  query: emptyQuery,
+});

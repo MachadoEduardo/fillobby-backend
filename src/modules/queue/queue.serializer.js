@@ -31,6 +31,7 @@ export function serializeQueueItem(item, { viewerHasVoted = false } = {}) {
     suggestedBy: serializeUserSummary(suggestedBy),
     status: item.status,
     voteCount: item.voteCount,
+    selfEnrollmentEnabled: item.selfEnrollmentEnabled ?? false,
     votingRoundId: item.votingRound?.toString() ?? null,
     viewerHasVoted,
     participantIds: item.participants.map(referenceId),

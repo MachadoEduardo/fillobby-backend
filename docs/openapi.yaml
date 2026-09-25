@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
   title: Fillobby API
-  version: 2.1.0
+  version: 2.2.0
   description: |
     API REST para grupos de amigos organizarem uma fila compartilhada de jogos.
 
@@ -1151,6 +1151,8 @@ paths:
       summary: Definir participantes
       description: |
         Exige `OWNER` ou `ADMIN` e item em `VOTING` ou `WAITING_PLAYERS`.
+        Em itens com autoinscrição ativa, use PATCH para evitar sobrescrever
+        entradas e saídas simultâneas.
         Todos os IDs devem representar membros ativos, sem duplicatas, e a
         quantidade deve respeitar `game.maxPlayers`.
 
@@ -1195,6 +1197,108 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      tags: [Queue]
+      operationId: adjustQueueParticipants
+      summary: Adicionar ou remover participantes sem substituir a lista inteira
+      description: Exige OWNER ou ADMIN e item em WAITING_PLAYERS ou READY. Preserva alterações simultâneas de outros membros.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdjustParticipantsInput"
+      responses:
+        "200":
+          description: Participantes e prontidão recalculados.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QueueItemSuccess"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/InsufficientGroupRole"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/ValidationError"
+
+  /api/v1/groups/{groupId}/queue/{itemId}/participants/me:
+    parameters:
+      - $ref: "#/components/parameters/GroupId"
+      - $ref: "#/components/parameters/ItemId"
+    post:
+      tags: [Queue]
+      operationId: joinQueueParticipants
+      summary: Inscrever-se no jogo
+      description: Requer membro ativo, autoinscrição ligada, item em WAITING_PLAYERS ou READY e vaga quando houver limite. Não marca prontidão.
+      responses:
+        "200":
+          description: Inscrição registrada, inclusive se já era participante.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QueueItemSuccess"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+    delete:
+      tags: [Queue]
+      operationId: leaveQueueParticipants
+      summary: Sair voluntariamente antes da partida
+      description: Disponível para membros ativos em WAITING_PLAYERS ou READY, mesmo com autoinscrição desligada. Remove a própria prontidão.
+      responses:
+        "200":
+          description: Participação retirada, inclusive se já estava ausente.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QueueItemSuccess"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /api/v1/groups/{groupId}/queue/{itemId}/self-enrollment:
+    parameters:
+      - $ref: "#/components/parameters/GroupId"
+      - $ref: "#/components/parameters/ItemId"
+    patch:
+      tags: [Queue]
+      operationId: setQueueSelfEnrollment
+      summary: Habilitar ou desabilitar autoinscrição do jogo
+      description: Exige OWNER ou ADMIN e item em WAITING_PLAYERS ou READY. Desligar não remove participantes.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SelfEnrollmentInput"
+      responses:
+        "200":
+          description: Preferência aplicada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QueueItemSuccess"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/InsufficientGroupRole"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/ValidationError"
 
   /api/v1/groups/{groupId}/queue/{itemId}/ready:
     parameters:
@@ -1498,6 +1602,18 @@ components:
             $ref: "#/components/schemas/ErrorResponse"
     GameNotFound:
       description: "`GAME_NOT_FOUND`: jogo inexistente ou inativo."
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    NotFound:
+      description: Grupo ou item inexistente ou inacessível.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Conflict:
+      description: O estado atual do item não permite a operação.
       content:
         application/json:
           schema:
@@ -1831,6 +1947,7 @@ components:
         - suggestedBy
         - status
         - voteCount
+        - selfEnrollmentEnabled
         - votingRoundId
         - viewerHasVoted
         - participantIds
@@ -1853,6 +1970,9 @@ components:
         voteCount:
           type: integer
           minimum: 0
+        selfEnrollmentEnabled:
+          type: boolean
+          description: Se membros ativos podem entrar por conta própria antes da partida.
         votingRoundId:
           type: [string, "null"]
           pattern: "^[a-fA-F0-9]{24}$"
@@ -2116,6 +2236,30 @@ components:
           uniqueItems: true
           items:
             $ref: "#/components/schemas/ObjectId"
+
+    AdjustParticipantsInput:
+      type: object
+      additionalProperties: false
+      required: [addIds, removeIds]
+      properties:
+        addIds:
+          type: array
+          uniqueItems: true
+          items:
+            $ref: "#/components/schemas/ObjectId"
+        removeIds:
+          type: array
+          uniqueItems: true
+          items:
+            $ref: "#/components/schemas/ObjectId"
+
+    SelfEnrollmentInput:
+      type: object
+      additionalProperties: false
+      required: [enabled]
+      properties:
+        enabled:
+          type: boolean
 
     HealthSuccess:
       type: object
