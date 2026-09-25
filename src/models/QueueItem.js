@@ -33,6 +33,7 @@ const queueItemSchema = new mongoose.Schema(
       default: [],
     },
     voteCount: { type: Number, default: 0, min: 0 },
+    votingRound: { type: mongoose.Schema.Types.ObjectId, ref: "VotingRound", default: null },
     completedAt: { type: Date, default: null },
   },
   { timestamps: true },

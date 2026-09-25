@@ -2,7 +2,7 @@ openapi: 3.1.0
 
 info:
   title: Fillobby API
-  version: 2.0.0
+  version: 2.1.0
   description: |
     API REST para grupos de amigos organizarem uma fila compartilhada de jogos.
 
@@ -843,6 +843,112 @@ paths:
         "422":
           $ref: "#/components/responses/ValidationError"
 
+  /api/v1/groups/{groupId}/voting-rounds:
+    parameters:
+      - $ref: "#/components/parameters/GroupId"
+    get:
+      tags: [Queue]
+      operationId: listVotingRounds
+      summary: Consultar rodadas de votação do grupo
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 20, default: 5 }
+      responses:
+        "200":
+          description: Rodadas recentes, incluindo a rodada ativa.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VotingRoundListSuccess" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/GroupNotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+    post:
+      tags: [Queue]
+      operationId: startVotingRound
+      summary: Abrir rodada com sugestões selecionadas
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StartVotingRoundInput" }
+      responses:
+        "201":
+          description: Rodada aberta.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VotingRoundSuccess" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/InsufficientGroupRole" }
+        "404": { $ref: "#/components/responses/GroupNotFound" }
+        "409":
+          description: Rodada já aberta, votação antiga pendente ou sugestão indisponível.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /api/v1/groups/{groupId}/voting-rounds/{roundId}/close:
+    parameters:
+      - $ref: "#/components/parameters/GroupId"
+      - name: roundId
+        in: path
+        required: true
+        schema: { $ref: "#/components/schemas/ObjectId" }
+    post:
+      tags: [Queue]
+      operationId: closeVotingRound
+      summary: Encerrar rodada e registrar vencedor
+      description: O maior placar vence; empate exige escolher um dos líderes. Sem votos, cancele a rodada.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CloseVotingRoundInput" }
+      responses:
+        "200":
+          description: Resultado registrado.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VotingRoundSuccess" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/InsufficientGroupRole" }
+        "404": { $ref: "#/components/responses/GroupNotFound" }
+        "409":
+          description: Rodada não aberta ou sem votos.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /api/v1/groups/{groupId}/voting-rounds/{roundId}/cancel:
+    parameters:
+      - $ref: "#/components/parameters/GroupId"
+      - name: roundId
+        in: path
+        required: true
+        schema: { $ref: "#/components/schemas/ObjectId" }
+    post:
+      tags: [Queue]
+      operationId: cancelVotingRound
+      summary: Cancelar rodada e devolver jogos às sugestões
+      responses:
+        "200":
+          description: Rodada cancelada.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VotingRoundSuccess" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/InsufficientGroupRole" }
+        "404": { $ref: "#/components/responses/GroupNotFound" }
+        "409":
+          description: Rodada não está aberta.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
   /api/v1/groups/{groupId}/queue:
     parameters:
       - $ref: "#/components/parameters/GroupId"
@@ -1666,6 +1772,55 @@ components:
           type: [string, "null"]
           format: uri
 
+    VotingRoundCandidate:
+      type: object
+      additionalProperties: false
+      required: [itemId, gameTitle, voteCount]
+      properties:
+        itemId: { $ref: "#/components/schemas/ObjectId" }
+        gameTitle: { type: string }
+        voteCount: { type: integer, minimum: 0 }
+
+    VotingRound:
+      type: object
+      additionalProperties: false
+      required: [id, groupId, status, candidates, startedBy, startedAt, closedBy, closedAt, winnerItemId]
+      properties:
+        id: { $ref: "#/components/schemas/ObjectId" }
+        groupId: { $ref: "#/components/schemas/ObjectId" }
+        status: { type: string, enum: [OPEN, CLOSED, CANCELLED] }
+        candidates:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items: { $ref: "#/components/schemas/VotingRoundCandidate" }
+        startedBy: { $ref: "#/components/schemas/UserSummary" }
+        startedAt: { type: string, format: date-time }
+        closedBy:
+          oneOf:
+            - { $ref: "#/components/schemas/UserSummary" }
+            - { type: "null" }
+        closedAt: { type: [string, "null"], format: date-time }
+        winnerItemId: { type: [string, "null"], pattern: "^[a-fA-F0-9]{24}$" }
+
+    StartVotingRoundInput:
+      type: object
+      additionalProperties: false
+      required: [candidateIds]
+      properties:
+        candidateIds:
+          type: array
+          minItems: 1
+          maxItems: 20
+          uniqueItems: true
+          items: { $ref: "#/components/schemas/ObjectId" }
+
+    CloseVotingRoundInput:
+      type: object
+      additionalProperties: false
+      properties:
+        winnerItemId: { $ref: "#/components/schemas/ObjectId" }
+
     QueueItem:
       type: object
       additionalProperties: false
@@ -1676,6 +1831,7 @@ components:
         - suggestedBy
         - status
         - voteCount
+        - votingRoundId
         - viewerHasVoted
         - participantIds
         - participants
@@ -1697,6 +1853,9 @@ components:
         voteCount:
           type: integer
           minimum: 0
+        votingRoundId:
+          type: [string, "null"]
+          pattern: "^[a-fA-F0-9]{24}$"
         viewerHasVoted:
           type: boolean
           description: Indica se o usuário autenticado já votou neste item.
@@ -2188,6 +2347,30 @@ components:
                 $ref: "#/components/schemas/Game"
             meta:
               $ref: "#/components/schemas/PaginationMeta"
+
+    VotingRoundSuccess:
+      type: object
+      additionalProperties: false
+      required: [success, data]
+      properties:
+        success: { type: boolean, const: true }
+        data: { $ref: "#/components/schemas/VotingRound" }
+
+    VotingRoundListSuccess:
+      type: object
+      additionalProperties: false
+      required: [success, data]
+      properties:
+        success: { type: boolean, const: true }
+        data:
+          type: object
+          additionalProperties: false
+          required: [rounds, meta]
+          properties:
+            rounds:
+              type: array
+              items: { $ref: "#/components/schemas/VotingRound" }
+            meta: { $ref: "#/components/schemas/PaginationMeta" }
 
     QueueItemSuccess:
       type: object

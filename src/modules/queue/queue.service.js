@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import Game from "../../models/Game.js";
 import GroupMember from "../../models/GroupMember.js";
 import QueueItem from "../../models/QueueItem.js";
+import VotingRound from "../../models/VotingRound.js";
 import AppError from "../../shared/errors/AppError.js";
 import { getActiveGroupContext } from "../groups/groups.service.js";
 import {
@@ -200,6 +201,9 @@ export async function transitionQueueItem({
       400,
     );
 
+  if (targetStatus === QUEUE_STATUS.VOTING && await VotingRound.exists({ group: group._id, status: "OPEN" }))
+    throw new AppError("VOTING_ROUND_ALREADY_OPEN", "Ja existe uma votacao aberta.", 409);
+
   item.status = targetStatus;
   item.completedAt =
     targetStatus === QUEUE_STATUS.COMPLETED ? new Date() : null;
@@ -221,6 +225,8 @@ export async function selectQueueParticipants({
   if (!editableStatuses.includes(item.status)) {
     throw participantsNotEditableError();
   }
+  if (item.status === QUEUE_STATUS.VOTING && item.votingRound)
+    throw participantsNotEditableError();
 
   const game = await Game.findById(item.game).select("maxPlayers");
   if (
@@ -256,6 +262,7 @@ export async function selectQueueParticipants({
       _id: item._id,
       group: group._id,
       status: { $in: editableStatuses },
+      $or: [{ status: QUEUE_STATUS.WAITING_PLAYERS }, { votingRound: null }],
     },
     [
       {
@@ -361,6 +368,8 @@ export async function cancelQueueItem({ groupId, userId, itemId }) {
   const { group, membership } = await getActiveGroupContext(groupId, userId);
   requireAdmin(membership);
   const item = await findQueueItem(group._id, itemId, false);
+  if (item.status === QUEUE_STATUS.VOTING && item.votingRound)
+    throw new AppError("VOTING_ROUND_ITEM_LOCKED", "Cancele a rodada para liberar este jogo.", 409);
   if (!ALLOWED_QUEUE_TRANSITIONS[item.status]?.includes(QUEUE_STATUS.CANCELLED))
     throw new AppError(
       "QUEUE_ITEM_IMMUTABLE",

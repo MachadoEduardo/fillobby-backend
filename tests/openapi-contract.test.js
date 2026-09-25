@@ -12,6 +12,7 @@ import GroupMember from "../src/models/GroupMember.js";
 import QueueItem from "../src/models/QueueItem.js";
 import User from "../src/models/User.js";
 import Vote from "../src/models/Vote.js";
+import VotingRound from "../src/models/VotingRound.js";
 
 const contract = parse(
   readFileSync(fileURLToPath(new URL("../docs/openapi.yaml", import.meta.url)), "utf8"),
@@ -61,6 +62,7 @@ integration("OpenAPI central flow contract", () => {
   });
   afterEach(async () => {
     await Vote.deleteMany({});
+    await VotingRound.deleteMany({});
     await QueueItem.deleteMany({});
     await Game.deleteMany({});
     await GroupMember.deleteMany({});
@@ -113,11 +115,11 @@ integration("OpenAPI central flow contract", () => {
     const queueList = await request(app).get(`/api/v1/groups/${groupId}/queue`)
       .set("Authorization", authorization);
     assertResponse("get", queuePath, queueList);
-    const statusPath = "/api/v1/groups/{groupId}/queue/{itemId}/status";
-    const voting = await request(app).patch(`/api/v1/groups/${groupId}/queue/${itemId}/status`)
-      .set("Authorization", authorization).send({ status: "VOTING" });
-    expect(voting.status).toBe(200);
-    assertResponse("patch", statusPath, voting);
+    const roundsPath = "/api/v1/groups/{groupId}/voting-rounds";
+    const voting = await request(app).post(`/api/v1/groups/${groupId}/voting-rounds`)
+      .set("Authorization", authorization).send({ candidateIds: [itemId] });
+    expect(voting.status).toBe(201);
+    assertResponse("post", roundsPath, voting);
     const votePath = "/api/v1/groups/{groupId}/queue/{itemId}/votes";
     const vote = await request(app).post(`/api/v1/groups/${groupId}/queue/${itemId}/votes`)
       .set("Authorization", authorization);
@@ -127,6 +129,14 @@ integration("OpenAPI central flow contract", () => {
       .set("Authorization", authorization);
     expect(duplicate.status).toBe(409);
     assertResponse("post", votePath, duplicate);
+    const closePath = "/api/v1/groups/{groupId}/voting-rounds/{roundId}/close";
+    const closed = await request(app).post(`/api/v1/groups/${groupId}/voting-rounds/${voting.body.data.id}/close`)
+      .set("Authorization", authorization).send({});
+    expect(closed.status).toBe(200);
+    assertResponse("post", closePath, closed);
+    const rounds = await request(app).get(`/api/v1/groups/${groupId}/voting-rounds`)
+      .set("Authorization", authorization);
+    assertResponse("get", roundsPath, rounds);
     const history = await request(app).get(`/api/v1/groups/${groupId}/history`)
       .set("Authorization", authorization);
     assertResponse("get", "/api/v1/groups/{groupId}/history", history);
