@@ -127,6 +127,8 @@ Criar uma rodada de votação com prazo opcional, encerramento explícito, resul
 - **Impacto:** fila, votos, histórico e interface.
 - **Tipo:** funcional e regra de negócio.
 
+**Concluído:** rodadas explícitas agrupam de 1 a 20 sugestões, com uma rodada aberta por grupo. Membros aprovam vários jogos; ao encerrar, o mais votado avança para seleção de participantes, e o administrador desempata se necessário. O resultado guarda contagens e responsável pelo encerramento. Os demais jogos voltam às sugestões com votos zerados; uma rodada sem votos pode ser cancelada. A interface mostra a rodada ativa e o histórico recente na fila. Prazo automático e votação ranqueada ficaram de fora por não haver demanda atual.
+
 ### 9. Participação mais autônoma — P1
 
 Permitir autoinscrição quando habilitada, saída voluntária antes da partida, capacidade, mínimo de jogadores e lista de espera. Toda alteração deve recalcular prontidão atomicamente.
